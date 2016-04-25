@@ -53,8 +53,8 @@ let trim : dir -> 'a tlist -> 'a tlist =
       | Nil -> failwith "poorly formed tree"
       | Leaf(elm) -> Cons(elm,t1)
       | Bin(lv,_,l,r) -> match d with
-        | L -> trim r (Level(lv,Tree(l,rest)))
-        | R -> trim l (Level(lv,Tree(r,rest)))
+        | L -> trim r (Level(lv,Tree(l,t1)))
+        | R -> trim l (Level(lv,Tree(r,t1)))
     in trim t rest
 
 let view_c : 'a raz -> 'a =
