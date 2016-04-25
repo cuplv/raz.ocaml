@@ -33,6 +33,14 @@ let _ =
 	let e = Raz.view_c r in
 	let _ = print_endline e in
 (*--------*)
+	let rec lots_of_refocus r =
+		print_string ".";
+		let r = Raz.focus (Raz.unfocus r) (Random.int 14) in
+		if (Random.int 100) < 1 then (print_endline ""; r) else
+		lots_of_refocus r
+	in
+	let r = lots_of_refocus r in
+(*--------*)
 	let push_l r = Raz.insert Raz.L r in
 	let push_r r = Raz.insert Raz.R r in
 	let pop_l r = (Raz.view Raz.L r,Raz.remove Raz.L r) in
@@ -53,4 +61,3 @@ let _ =
 	let _ = print_endline (c) in
 	(* let _ = print_endline (a^b^c) in *)
 	None
-	

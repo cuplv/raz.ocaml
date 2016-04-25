@@ -83,7 +83,7 @@ let alter : dir -> 'a -> 'a raz -> 'a raz =
 let insert :  dir -> 'a -> 'a raz -> 'a raz =
   fun d ne (l,e,r) -> match d with
   | L -> (Level(rnd_level(),Cons(ne,l)),e,r)
-  | R -> (l,e,Cons(ne,Level(rnd_level(),r)))
+  | R -> (l,e,Level(rnd_level(),Cons(ne,r)))
 
 let remove : dir -> 'a raz -> 'a raz =
   let rec remove d s = match s with
@@ -127,21 +127,21 @@ let rec focus : 'a tree -> int -> 'a raz =
       else focus br (p - c) (Level(lv,Tree(bl,l)),r)
   in focus t p (Nil,Nil)
 
-let rec append : 'a tree -> 'a tree -> 'a tree =
+let rec join_sides : 'a tree -> 'a tree -> 'a tree =
   fun t1 t2 -> 
   let tot = (item_count t1)+(item_count t2) in
   match (t1, t2) with
   | Nil, _ -> t2 | _, Nil -> t1
   | Leaf(_), Leaf(_) ->
-    Bin(rnd_level(), tot, t1, t2)
+    failwith "leaf-leaf: full trees shouldn't be joined"
   | Leaf(_), Bin(lv,_,l,r) ->
-    Bin(lv, tot, append t1 l, r)
+    Bin(lv, tot, join_sides t1 l, r)
   | Bin(lv,_,l,r), Leaf(_) ->
-    Bin(lv, tot, l, append r t2)
+    Bin(lv, tot, l, join_sides r t2)
   | Bin(lv1,_,t1l,t1r), Bin(lv2,_,t2l,t2r) ->
     if lv1 >= lv2
-    then Bin(lv1, tot, t1l, append t1r t2)
-    else Bin(lv2, tot, append t1 t2l, t2r)
+    then Bin(lv1, tot, t1l, join_sides t1r t2)
+    else Bin(lv2, tot, join_sides t1 t2l, t2r)
 
 let head_as_tree : 'a tlist -> 'a tree =
   fun l -> match l with
@@ -164,13 +164,13 @@ let grow : dir -> 'a tlist -> 'a tree =
     match t1 with Nil -> h1 | _ ->
     let h2 = head_as_tree t1 in
     match d with
-    | L -> grow (append h2 h1) (tail t1)
-    | R -> grow (append h1 h2) (tail t1)  
+    | L -> grow (join_sides h2 h1) (tail t1)
+    | R -> grow (join_sides h1 h2) (tail t1)  
   in grow (head_as_tree t) (tail t)
 
 let unfocus : 'a raz -> 'a tree =
-  fun (l,e,r) -> append (grow L l)
-    (append (Leaf(e)) (grow R r))
+  fun (l,e,r) -> join_sides (grow L l)
+    (join_sides (Leaf(e)) (grow R r))
 
 let print_raz : ('a -> string) -> 'a raz -> unit =
   fun string_of_elm (l,e,r) ->
