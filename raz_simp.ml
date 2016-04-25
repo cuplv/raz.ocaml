@@ -171,3 +171,29 @@ let grow : dir -> 'a tlist -> 'a tree =
 let unfocus : 'a raz -> 'a tree =
   fun (l,e,r) -> append (grow L l)
     (append (Leaf(e)) (grow R r))
+
+let print_raz : ('a -> string) -> 'a raz -> unit =
+  fun string_of_elm (l,e,r) ->
+    let rec list_of_tree : dir -> 'a tree -> 'a list -> 'a list =
+    fun d t acc -> match t with
+    | Nil -> acc
+    | Leaf(e) -> e::acc
+    | Bin(_,_,t1,t2) -> match d with
+      | L -> acc |> list_of_tree d t2 |> list_of_tree d t1
+      | R -> acc |> list_of_tree d t1 |> list_of_tree d t2
+    in
+    let rec list_of_half : dir -> 'a tlist -> 'a list -> 'a list =
+    fun d h acc -> match h with
+    | Nil -> acc
+    | Cons(e,rest) -> list_of_half d rest (e::acc)
+    | Level(_,rest) -> list_of_half d rest acc
+    | Tree(t,rest) -> list_of_half d rest (list_of_tree d t acc)
+    in
+    let stringify acc e = acc ^ (string_of_elm e) ^ "; " in
+    let l = list_of_half L l [] in
+    let r = List.rev (list_of_half R r []) in
+    let acc = List.fold_left stringify "" l in
+    let acc = acc ^ ":" ^ (string_of_elm e) ^ ":; " in
+    let acc = List.fold_left stringify acc r in
+    print_endline acc;
+

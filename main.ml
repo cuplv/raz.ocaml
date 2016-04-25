@@ -1,9 +1,11 @@
 module F = Fingertree
 module Raz = Raz_simp
 
+let print_raz = Raz.print_raz (fun e -> e)
+
 let _ =
 	Random.self_init();
-	let _ = print_int (Raz.rnd_level()) in
+	let _ = print_int (Raz.rnd_level()); print_endline "" in
 	let r = Raz.singleton "r" in
 	let r = Raz.insert Raz.L "e" r in
 	let r = Raz.insert Raz.L "f" r in
@@ -21,14 +23,15 @@ let _ =
 	let r = Raz.focus (Raz.unfocus r) 4 in
 	let r = Raz.move Raz.L r in
 	let e = Raz.view_c r in
-	let _ = print_string e in
+	let _ = print_endline e in
 	let r = Raz.focus (Raz.unfocus r) 7 in
 	let e = Raz.view_c r in
-	let _ = print_string e in
+	let _ = print_endline e in
 	let r = Raz.alter_c "L" r in
 	let r = Raz.focus (Raz.unfocus r) 7 in
+	let _ = print_raz r in
 	let e = Raz.view_c r in
-	let _ = print_string e in
+	let _ = print_endline e in
 (*--------*)
 	let push_l r = Raz.insert Raz.L r in
 	let push_r r = Raz.insert Raz.R r in
@@ -41,11 +44,13 @@ let _ =
 	let r = push_l "4" r in
 	let r = push_l "5" r in
 	let r = Raz.focus (Raz.unfocus r) 0 in
+	(* let _ = print_raz r in *)
 	let (a,r) = pop_r r in
-	let _ = print_string (a) in
+	let _ = print_endline (a) in
 	let (b,r) = pop_r r in
-	let _ = print_string (b) in
+	let _ = print_endline (b) in
 	let (c,r) = pop_r r in
-	let _ = print_string (c) in
-	(* let _ = print_string (a^b^c) in *)
+	let _ = print_endline (c) in
+	(* let _ = print_endline (a^b^c) in *)
 	None
+	
