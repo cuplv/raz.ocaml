@@ -60,4 +60,26 @@ let _ =
 	let (c,r) = pop_r r in
 	let _ = print_endline (c) in
 	(* let _ = print_endline (a^b^c) in *)
+
+	let f = F.singleton "a" in
+	let f = F.snoc f "b" in
+	let f = F.snoc f "c" in
+	let f = F.snoc f "d" in
+	let f = F.snoc f "e" in
+	let f = F.snoc f "f" in
+	let f = F.snoc f "g" in
+	let f = F.snoc f "h" in
+	let f = F.snoc f "i" in
+	let f = F.set f 3 "D" in
+
+	let rec print_ft ft =
+		match F.head ft with
+		| None -> print_endline ""
+		| Some(h) -> 
+			print_string h;
+			print_string "; ";
+			print_ft (F.tail_exn ft)
+	in
+	print_ft f;
 	None
+
