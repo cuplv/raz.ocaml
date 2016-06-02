@@ -6,7 +6,7 @@ let print_raz = Raz.print_raz (fun e -> e)
 let rec print_ft ft =
 	match F.head ft with
 	| None -> print_endline ""
-	| Some(h) -> 
+	| Some(h) ->
 		print_string h;
 		print_string "; ";
 		print_ft (F.tail_exn ft)
@@ -90,7 +90,8 @@ let test () =
 	print_ft f;
 	None
 
-let eval () =
+let eval high =
+	let count = high / 100 in
 	let rec insert_ft n ft =
 		if n <= 0 then ft else
 		let ft = F.snoc ft n in
@@ -115,18 +116,60 @@ let eval () =
 		let r = Raz.insert Raz.L n r in
 		rnd_insert_r (sz+1) (n-1) r
 	in
+	let rec insert_remove_ft sz n ft =
+		let ins_rem ft =
+			(* insert 5 *)
+			let ft = F.snoc ft n in
+			let ft = F.snoc ft n in
+			let ft = F.snoc ft n in
+			let ft = F.snoc ft n in
+			let ft = F.snoc ft n in
+			(* remove 4 *)
+			let ft = F.init_exn ft in
+			let ft = F.init_exn ft in
+			let ft = F.init_exn ft in
+			let ft = F.init_exn ft in
+			ft
+		in
+		if n <= 0 then ft else
+		let p = Random.int (sz+1) in
+  		let left, right = F.split_at ft p in
+  		let ft = F.append (ins_rem left) right in
+		insert_remove_ft (sz+1) (n-1) ft
+	in
+	let rec insert_remove_r sz n r =
+		let ins_rem r =
+			(* insert 5 *)
+			let r = Raz.insert Raz.L n r in
+			let r = Raz.insert Raz.L n r in
+			let r = Raz.insert Raz.L n r in
+			let r = Raz.insert Raz.L n r in
+			let r = Raz.insert Raz.L n r in
+			(* remove 4 *)
+			let r = Raz.remove Raz.L r in
+			let r = Raz.remove Raz.L r in
+			let r = Raz.remove Raz.L r in
+			let r = Raz.remove Raz.L r in
+			r
+		in
+		if n <= 0 then r else
+		let p = Random.int (sz+1) in
+		let r = Raz.focus (Raz.unfocus r) p in
+		let r = ins_rem r in
+		rnd_insert_r (sz+1) (n-1) r
+	in
 
 	let r = Raz.singleton 0 |> Raz.insert Raz.L 0 in
 	let ft = F.snoc (F.singleton 0) 0 in
 	Printf.printf "Test,Param,RAZ,Fingertree\n%!";
 	for i = 0 to 100 do
-		let n = 1000000 in
+		let n = i*count*10 in
 		let (t_r,_) = time (fun()->insert_r n r) in
 		let (t_ft,_) = time (fun()->insert_ft n ft) in
 		Printf.printf "Insert,%d,%.4f,%.4f\n%!" n t_r t_ft;
 	done;
 	for i = 0 to 100 do
-		let n = 100000 in
+		let n = i*count in
 		let seed = Random.bits() in
 		Random.init seed;
 		let (t_r,_) = time (fun()->rnd_insert_r 0 n r) in
@@ -134,9 +177,18 @@ let eval () =
 		let (t_ft,_) = time (fun()->rnd_insert_ft 0 n ft) in
 		Printf.printf "RndSingle,%d,%.4f,%.4f\n%!" n t_r t_ft;
 	done;
+	for i = 0 to 100 do
+		let n = i*count in
+		let seed = Random.bits() in
+		Random.init seed;
+		let (t_r,_) = time (fun()->insert_remove_r 0 n r) in
+		Random.init seed;
+		let (t_ft,_) = time (fun()->insert_remove_ft 0 n ft) in
+		Printf.printf "5less4,%d,%.4f,%.4f\n%!" n t_r t_ft;
+	done;
 
 	None
 
 
 (* let _ = test() *)
-let _ = eval()
+let _ = eval 1000000
