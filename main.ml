@@ -1,3 +1,12 @@
+(* 
+This file is mostly tests of correctness and performance.
+
+RAZ code is all in  'raz_simp.ml'
+
+Fingertree impl is in 'fingertree.ml'
+'bat*.ml' files support the fingertree code.
+Fingertree and supporting files are from 'https://github.com/ocaml-batteries-team/batteries-included'
+*)
 module F = Fingertree
 module Raz = Raz_simp
 
@@ -162,12 +171,14 @@ let eval high =
 	let r = Raz.singleton 0 |> Raz.insert Raz.L 0 in
 	let ft = F.snoc (F.singleton 0) 0 in
 	Printf.printf "Test,Param,RAZ,Fingertree\n%!";
+(*
 	for i = 0 to 100 do
 		let n = i*count*10 in
 		let (t_r,_) = time (fun()->insert_r n r) in
 		let (t_ft,_) = time (fun()->insert_ft n ft) in
 		Printf.printf "Insert,%d,%.4f,%.4f\n%!" n t_r t_ft;
 	done;
+*)
 	for i = 0 to 100 do
 		let n = i*count in
 		let seed = Random.bits() in
@@ -191,4 +202,4 @@ let eval high =
 
 
 (* let _ = test() *)
-let _ = eval 1000000
+let _ = eval 10000000

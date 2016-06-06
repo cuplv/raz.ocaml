@@ -17,6 +17,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *)
 
+(* 
+Fingertree and supporting files are from 'https://github.com/ocaml-batteries-team/batteries-included'
+*)
+
+
 type 'a monoid = {
   zero : 'a;
   combine : 'a -> 'a -> 'a ;
