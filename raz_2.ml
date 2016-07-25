@@ -6,11 +6,11 @@ type bin_info = { lev:lev; elm_cnt:cnt }
 type 'a tree  = Bin  of bin_info * 'a tree * 'a tree
 	      | Leaf of 'a
 	      | Nil
-type 'a tlist = Cons of 'a      * 'a llist
-	      | Tree of 'a tree * 'a llist
+type 'a tlist = Cons of 'a      * 'a llist (* Invariant: Cons always followed by a level *)
+	      | Tree of 'a tree * 'a llist (* Invariant: Tree always followed by a level; tree does not use Nil before level. *)
 	      | Nil
  and 'a llist = Lev of lev      * 'a tlist
-    	      | LevNil
+    	      | LevNil (* TODO: Decide whether to drop this LevNil case; it will simplify the code below a lot *)
 type 'a zip   = { left:'a tlist; lev:lev; right:'a tlist}
 
 let empty (l:lev) : 'a zip = {left=Nil;lev=l;right=Nil}
