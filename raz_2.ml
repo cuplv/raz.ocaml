@@ -1,4 +1,3 @@
-
 type lev      = int
 type cnt      = int
 type dir      = L | R
@@ -12,8 +11,13 @@ type 'a tlist = Cons of 'a      * 'a llist (* Invariant: Cons always followed by
  and 'a llist = Lev of lev      * 'a tlist
 type 'a zip   = { left:'a tlist; lev:lev; right:'a tlist}
 
-let empty (l:lev) : 'a zip = {left=Nil;lev=l;right=Nil}
-let singleton (le:lev) (e:'a) (lc:lev) (d:dir) : 'a zip = 
+let empty (l:lev) : 'a zip = 
+  {left=Nil;lev=l;right=Nil}
+
+let tree_of_lev (l:lev) : 'a tree = 
+  Bin({lev=l;elm_cnt=0},Nil,Nil)
+
+let singleton_elm_zip (le:lev) (e:'a) (lc:lev) (d:dir) : 'a zip = 
   match d with
   | L -> {left=Cons(e,Lev(le,Nil));lev=lc;right=Nil}
   | R -> {left=Nil;lev=lc;right=Cons(e,Lev(le,Nil))}
@@ -53,36 +57,79 @@ let do_zip_cmd : 'a zip_cmd -> 'a zip_cmds =
      | L -> fun z -> {z with left  = Cons(a, Lev(lev, z.left ))}
      | R -> fun z -> {z with right = Cons(a, Lev(lev, z.right))}
   )
-  | Remove (d) -> ( 
-    match d with
-    | L -> ( fun z -> match trim L z.left with
-		      | None                -> z
-		      | Some((_, Lev(_,l))) -> {z with left=l} )
-	     
-    | R -> ( fun z -> match trim R z.right with
-		      | None                -> z
-		      | Some((_, Lev(_,l))) -> {z with right=l} )
-  )
-  | Replace (d,a) -> ( 
-    match d with
-    | L -> (fun z -> match trim L z.left with
-		     | None                   -> z
-		     | Some((_, Lev(lev, l))) -> {z with left=Cons(a, Lev(lev, l))}
-	   )
-    | R -> (fun z -> match trim R z.right with
-		     | None                   -> z
-		     | Some((_, Lev(lev, l))) -> {z with right=Cons(a, Lev(lev, l))}
-	   )
-  )
-  | Move (d) -> (
-    match d with
-    | L -> (fun z -> match trim L z.left with
-		     | None                   -> z
-		     | Some((a, Lev(lev, l))) -> {z with left=l; right=Cons(a, Lev(lev, z.right))}
-	   )
-    | R -> (fun z -> match trim R z.right with
-		     | None                   -> z
-		     | Some((a, Lev(lev, l))) -> {z with right=l; left=Cons(a, Lev(lev, z.left))}
-	   )
-  )
+  | ( Remove (d) 
+    | Replace(d,_) 
+    | Move   (d) ) as cmd -> ( 
+    fun z -> 
+    let trimmed = match d with
+      | L -> trim L z.left
+      | R -> trim L z.right
+    in
+    match trimmed with 
+    | None -> z
+    | Some((elm, Lev(lev, rest))) -> (
+      match cmd with 
+      | Insert _ -> failwith "impossible"
+      | Remove(_) -> 
+	 (match d with L -> {z with left =rest} 
+		     | R -> {z with right=rest})
+      | Replace(_, a) -> 
+	 (match d with L -> {z with left =Cons(a, Lev(lev, rest))}
+		     | R -> {z with right=Cons(a, Lev(lev, rest))})
+      | Move(_) -> 
+	 (match d with L -> {z with left =rest; right=Cons(elm,Lev(lev,z.right))}
+		     | R -> {z with right=rest; left =Cons(elm,Lev(lev,z.left ))})))
 
+let rec append (t1:'a tree) (t2:'a tree) : 'a tree =
+  let elm_cnt = (elm_cnt_of_tree t1) + (elm_cnt_of_tree t2) in
+  match t1, t2 with
+  | Nil, _ -> t2 
+  | _, Nil -> t1
+  | Leaf(_), Leaf(_)       -> failwith "illegal argument: Leaf-Leaf case not handled"
+  | Leaf(a), Bin(bi, l, r) -> Bin({lev=bi.lev;elm_cnt=elm_cnt}, append t1 l, r)
+  | Bin(bi, l, r), Leaf(a) -> Bin({lev=bi.lev;elm_cnt=elm_cnt}, l, append r t2)
+  | Bin(bi1, l1, r1), 
+    Bin(bi2, l2, r2) -> if bi1.lev >= bi2.lev
+			then Bin({lev=bi1.lev;elm_cnt=elm_cnt}, l1, append r1 t2)
+			else Bin({lev=bi2.lev;elm_cnt=elm_cnt}, append t1 l2, r2)
+
+let tlist_hd : 'a tlist -> 'a tree = function
+  | Nil       -> Nil
+  | Cons(s,_) -> Leaf(s)
+  | Tree(t,_) -> t
+
+let tlist_tl : 'a tlist -> lev * 'a tlist = function
+  | Nil -> failwith "illegal argument"
+  | Cons(_,Lev(lev,r)) | Tree(_,Lev(lev,r)) -> (lev, r)
+
+let append_all (d:dir) (trees:'a tlist) : 'a tree =
+  let rec loop (tree:'a tree) : lev * 'a tlist -> 'a tree = function
+    | (lev, Nil)   -> tree
+    | (lev, trees) -> 
+       let tree2 = tlist_hd trees in 
+       match d with
+       | L -> loop (append tree2 (append (tree_of_lev lev) tree)) (tlist_tl trees)
+       | R -> loop (append (append tree (tree_of_lev lev)) tree2) (tlist_tl trees)
+  in loop (tlist_hd trees) (tlist_tl trees)
+
+let unfocus (z: 'a zip) : 'a tree = 
+  append (append_all L z.left) 
+	 (append (tree_of_lev z.lev) (append_all R z.right))
+
+(* let rec focus : 'a tree -> int -> 'a raz = *)
+(*   fun t p -> (\* first a top-level bounds check *\) *)
+(*   let c = item_count t in *)
+(*   if p >= c then focus t (c - 1) else *)
+(*   if p < 0 then focus t 0 else *)
+(*   let rec focus : 'a tree -> int -> ('a tlist * 'a tlist) -> 'a raz = *)
+(*     fun t p (l,r) -> match t with *)
+(*     | Nil -> failwith "internal Nil" *)
+(*     | Leaf(elm) ->  *)
+(*       assert (p == 0); *)
+(*       (l,elm,r) *)
+(*     | Bin(lv, _, bl, br) ->  *)
+(*       let c = item_count bl in *)
+(*       if p < c *)
+(*       then focus bl p (l,Level(lv,Tree(br,r))) *)
+(*       else focus br (p - c) (Level(lv,Tree(bl,l)),r) *)
+(*   in focus t p (Nil,Nil) *)
