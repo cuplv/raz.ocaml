@@ -10,14 +10,13 @@ type 'a tlist = Cons of 'a      * 'a llist (* Invariant: Cons always followed by
 	      | Tree of 'a tree * 'a llist (* Invariant: Tree always followed by a level; tree does not use Nil before level. *)
 	      | Nil
  and 'a llist = Lev of lev      * 'a tlist
-    	      | LevNil (* TODO: Decide whether to drop this LevNil case; it will simplify the code below a lot *)
 type 'a zip   = { left:'a tlist; lev:lev; right:'a tlist}
 
 let empty (l:lev) : 'a zip = {left=Nil;lev=l;right=Nil}
-let singleton (e:'a) (l:lev) (d:dir) : 'a zip = 
+let singleton (le:lev) (e:'a) (lc:lev) (d:dir) : 'a zip = 
   match d with
-  | L -> {left=Cons(e,LevNil);lev=l;right=Nil}
-  | R -> {left=Nil;lev=l;right=Cons(e,LevNil)}
+  | L -> {left=Cons(e,Lev(le,Nil));lev=lc;right=Nil}
+  | R -> {left=Nil;lev=lc;right=Cons(e,Lev(le,Nil))}
 
 let elm_cnt_of_tree (t:'a tree) : cnt = 
   match t with
@@ -54,23 +53,36 @@ let do_zip_cmd : 'a zip_cmd -> 'a zip_cmds =
      | L -> fun z -> {z with left  = Cons(a, Lev(lev, z.left ))}
      | R -> fun z -> {z with right = Cons(a, Lev(lev, z.right))}
   )
-  | Remove (d) -> (
+  | Remove (d) -> ( 
     match d with
-    | L -> ( 
-      fun z -> match trim L z.left with
-	       | None -> z
-	       | Some((_, llist)) -> match llist with 
-				     | LevNil -> {z with left=Nil}
-				     | Lev(_,l) -> {z with left=l}
-    )
-    | R -> (
-      fun z -> match trim R z.right with
-	       | None -> z
-	       | Some((_, rlist)) -> match rlist with 
-				     | LevNil -> {z with right=Nil}
-				     | Lev(_,r) -> {z with right=r}
-    )
+    | L -> ( fun z -> match trim L z.left with
+		      | None                -> z
+		      | Some((_, Lev(_,l))) -> {z with left=l} )
+	     
+    | R -> ( fun z -> match trim R z.right with
+		      | None                -> z
+		      | Some((_, Lev(_,l))) -> {z with right=l} )
   )
-  | Replace (d,a) -> failwith "TODO"
-  | Move (d) -> failwith "TODO"
+  | Replace (d,a) -> ( 
+    match d with
+    | L -> (fun z -> match trim L z.left with
+		     | None                   -> z
+		     | Some((_, Lev(lev, l))) -> {z with left=Cons(a, Lev(lev, l))}
+	   )
+    | R -> (fun z -> match trim R z.right with
+		     | None                   -> z
+		     | Some((_, Lev(lev, l))) -> {z with right=Cons(a, Lev(lev, l))}
+	   )
+  )
+  | Move (d) -> (
+    match d with
+    | L -> (fun z -> match trim L z.left with
+		     | None                   -> z
+		     | Some((a, Lev(lev, l))) -> {z with left=l; right=Cons(a, Lev(lev, z.right))}
+	   )
+    | R -> (fun z -> match trim R z.right with
+		     | None                   -> z
+		     | Some((a, Lev(lev, l))) -> {z with right=l; left=Cons(a, Lev(lev, z.left))}
+	   )
+  )
 

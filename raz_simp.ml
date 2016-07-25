@@ -17,12 +17,6 @@ type 'a raz = ('a tlist * 'a * 'a tlist)
 
 (* neg binomial dist *)
 let rnd_level : unit -> lev =
-(*
-  let c = ref 0 in
-  fun () ->
-  c := !c + 1;
-  !c
- *)
   fun () ->
   let rec ffs x =
     if x = 0 then 0 else
