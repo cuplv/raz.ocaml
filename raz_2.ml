@@ -8,14 +8,12 @@ type bin_info = { lev:lev; elm_cnt:cnt }
 type 'a tree  = Bin  of bin_info * 'a tree * 'a tree
 	      | Leaf of 'a
 	      | Nil
-type 'a tlist = Cons of 'a      * 'a llist (* Invariant: Cons always followed by a level *)
-	      | Tree of 'a tree * 'a llist (* Invariant: Tree always followed by a level; tree does not use Nil before level. *)
-	      | Nil
- and 'a llist = Lev of lev      * 'a tlist
-type 'a zip   = { left:'a tlist; lev:lev; right:'a tlist}
+type 'a elms  = Cons of 'a * lev * 'a elms (* Invariant: element always followed by a level *)
+	      | Trees of ('a tree) list    (* Invariant: trees not interposed with elements/levels *)
+type 'a zip   = { left:'a elms; lev:lev; right:'a elms}
 
 let empty (l:lev) : 'a zip = 
-  {left=Nil;lev=l;right=Nil}
+  {left=Trees([]);lev=l;right=Trees([])}
 
 let tree_of_lev (l:lev) : 'a tree = 
   Bin({lev=l;elm_cnt=0},Nil,Nil)
@@ -26,93 +24,95 @@ let elm_cnt_of_tree (t:'a tree) : cnt =
   | Leaf(_)     -> 1
   | Nil         -> 0
 
-let trim (d:dir) (t:'a tlist) : ('a * 'a llist) option =
+let trim (d:dir) (t:'a elms) : ('a * lev * 'a elms) option =
   match t with
-  | Nil -> None
-  | Cons(a, llist) -> Some((a, llist))
-  | Tree(t, llist) -> 
-     let rec loop (t:'a tree) (l:'a llist) : ('a * 'a llist) option =
-       match t with
-       | Nil                  -> failwith "poorly formed tree"
-       | Leaf(a)              -> Some((a, llist))
-       | Bin(bi, left, right) -> 
+  | Cons(a, lev, elms) -> Some((a, lev, elms))
+  | Trees([])          -> None
+  | Trees(tree::trees) -> 
+     let rec loop (t:'a tree) (lo:lev option) (trees:('a tree)list ) 
+	     : ('a * lev * 'a elms) option =
+       match t, lo with
+       | Nil, _                  -> failwith "poorly formed tree"
+       | Leaf(_), None           -> failwith "poorly formed tree"
+       | Leaf(a), Some(lev)      -> Some((a, lev, Trees(trees)))
+       | Bin(bi, left, right), _ -> 
+	  let trees = match lo with None      -> trees
+				  | Some(lev) -> (tree_of_lev lev) :: trees
+	  in
 	  match d with
-	  | L -> loop left  (Lev(bi.lev, Tree(right, l)))
-	  | R -> loop right (Lev(bi.lev, Tree(left,  l)))
-     in loop t llist
+	  | L -> loop left  (Some bi.lev) (right :: trees)
+	  | R -> loop right (Some bi.lev) (left  :: trees)
+     in loop tree None trees
 		       
-type 'a zip_cmd = 
+type 'a zip_cmd =
   | Insert  of dir * 'a * lev
-  | Remove  of dir 
-  | Replace of dir * 'a 
+  | Remove  of dir
+  | Replace of dir * 'a
   | Move    of dir
 type 'a zip_cmds = 'a zip -> 'a zip
 
 let do_zip_cmd : 'a zip_cmd -> 'a zip_cmds =
-  function 
+  function
   | Insert (d,a,lev) -> (
-     match d with 
-     | L -> fun z -> {z with left  = Cons(a, Lev(lev, z.left ))}
-     | R -> fun z -> {z with right = Cons(a, Lev(lev, z.right))}
+     match d with
+     | L -> fun z -> {z with left  = Cons(a, lev, z.left )}
+     | R -> fun z -> {z with right = Cons(a, lev, z.right)}
   )
-  | ( Remove (d) 
-    | Replace(d,_) 
-    | Move   (d) ) as cmd -> ( 
-    fun z -> 
+  | ( Remove (d)
+    | Replace(d,_)
+    | Move   (d) ) as cmd -> (
+    fun z ->
     let trimmed = match d with
       | L -> trim L z.left
       | R -> trim L z.right
     in
-    match trimmed with 
+    match trimmed with
     | None -> z (* do nothing *)
-    | Some((elm, Lev(lev, rest))) -> (
-      match cmd with 
+    | Some((elm, lev, rest)) -> (
+      match cmd with
       | Insert _ -> failwith "impossible"
-      | Remove(_) -> 
-	 (match d with L -> {z with left =rest} 
+      | Remove(_) ->
+	 (match d with L -> {z with left =rest}
 		     | R -> {z with right=rest})
-      | Replace(_, a) -> 
-	 (match d with L -> {z with left =Cons(a, Lev(lev, rest))}
-		     | R -> {z with right=Cons(a, Lev(lev, rest))})
-      | Move(_) -> 
-	 (match d with L -> {left =rest; lev=lev; right=Cons(elm,Lev(z.lev,z.right))}
-		     | R -> {right=rest; lev=lev; left =Cons(elm,Lev(z.lev,z.left ))})))
+      | Replace(_, a) ->
+	 (match d with L -> {z with left =Cons(a, lev, rest)}
+		     | R -> {z with right=Cons(a, lev, rest)})
+      | Move(_) ->
+	 (match d with L -> {left =rest; lev=lev; right=Cons(elm,z.lev,z.right)}
+		     | R -> {right=rest; lev=lev; left =Cons(elm,z.lev,z.left )})))
 
 let rec append (t1:'a tree) (t2:'a tree) : 'a tree =
   let elm_cnt = (elm_cnt_of_tree t1) + (elm_cnt_of_tree t2) in
   match t1, t2 with
-  | Nil, _ -> t2 
+  | Nil, _ -> t2
   | _, Nil -> t1
   | Leaf(_), Leaf(_)       -> failwith "illegal argument: Leaf-Leaf case not handled"
   | Leaf(a), Bin(bi, l, r) -> Bin({lev=bi.lev;elm_cnt=elm_cnt}, append t1 l, r)
   | Bin(bi, l, r), Leaf(a) -> Bin({lev=bi.lev;elm_cnt=elm_cnt}, l, append r t2)
-  | Bin(bi1, l1, r1), 
+  | Bin(bi1, l1, r1),
     Bin(bi2, l2, r2) -> if bi1.lev >= bi2.lev
 			then Bin({lev=bi1.lev;elm_cnt=elm_cnt}, l1, append r1 t2)
 			else Bin({lev=bi2.lev;elm_cnt=elm_cnt}, append t1 l2, r2)
 
-let tlist_hd : 'a tlist -> 'a tree = function
-  | Nil       -> Nil
-  | Cons(s,_) -> Leaf(s)
-  | Tree(t,_) -> t
+let rec tree_of_trees (d:dir) (tree:'a tree) (trees:('a tree)list) : 'a tree =
+  match trees with
+  | [] -> tree
+  | tree2::trees -> 
+     match d with
+     | L -> tree_of_trees d (append tree tree2) trees
+     | R -> tree_of_trees d (append tree2 tree) trees
 
-let tlist_tl : 'a tlist -> lev * 'a tlist = function
-  | Nil -> failwith "illegal argument"
-  | Cons(_,Lev(lev,r)) | Tree(_,Lev(lev,r)) -> (lev, r)
+let rec tree_of_elms (d:dir) (tree:'a tree) (elms:'a elms) : 'a tree =
+  match elms with
+  | Trees(trees)       -> tree_of_trees d tree trees
+  | Cons(elm,lev,elms) -> 
+     match d with
+     | L -> tree_of_elms d (append tree (append (Leaf elm) (tree_of_lev lev))) elms
+     | R -> tree_of_elms d (append (tree_of_lev lev) (append (Leaf elm) tree)) elms
 
-let append_all (d:dir) (trees:'a tlist) : 'a tree =
-  let rec loop (tree:'a tree) : lev * 'a tlist -> 'a tree = function
-    | (lev, Nil)   -> tree
-    | (lev, trees) -> 
-       let tree2 = tlist_hd trees in 
-       match d with
-       | L -> loop (append tree2 (append (tree_of_lev lev) tree)) (tlist_tl trees)
-       | R -> loop (append (append tree (tree_of_lev lev)) tree2) (tlist_tl trees)
-  in loop (tlist_hd trees) (tlist_tl trees)
-
-let unfocus (z: 'a zip) : 'a tree = 
-  append (append_all L z.left) 
-	 (append (tree_of_lev z.lev) (append_all R z.right))
+let unfocus (z: 'a zip) : 'a tree =
+  append (tree_of_elms L Nil                 z.left ) 
+	 (tree_of_elms R (tree_of_lev z.lev) z.right)
 
 (*
 let focus (tree:'a tree) (pos:int) : 'a zip =
@@ -138,7 +138,23 @@ let focus (tree:'a tree) (pos:int) : 'a zip =
   | Bin(a, Nil, Nil)                 -> {left=Nil; lev=a.lev; right=Nil}
   | Bin(a, Bin(b, Nil, Leaf(x)), t3) -> {left=Nil; 
  *)
-     
+
+(* Count valid instances:
+
+0: a
+Bin(a, Nil, Nil)
+
+1: a x b
+Bin(b, Bin(a, Nil, Leaf(x)), Nil)
+Bin(a, Nil, Bin(b, Leaf(x), Nil))
+
+2: a x b y c
+Bin(a, Bin(b, Nil, Leaf(x)), Nil)
+Bin(a, Nil, Bin(b, Leaf(x), Nil))
+
+
+
+ *)
 
 (* let rec focus : 'a tree -> int -> 'a raz = *)
 (*   fun t p -> (\* first a top-level bounds check *\) *)
