@@ -20,11 +20,6 @@ let empty (l:lev) : 'a zip =
 let tree_of_lev (l:lev) : 'a tree = 
   Bin({lev=l;elm_cnt=0},Nil,Nil)
 
-(* let zip_of_elm (le:lev) (e:'a) (lc:lev) (d:dir) : 'a zip =  *)
-(*   match d with *)
-(*   | L -> {left=Cons(e,Lev(le,Nil));lev=lc;right=Nil} *)
-(*   | R -> {left=Nil;lev=lc;right=Cons(e,Lev(le,Nil))} *)
-
 let elm_cnt_of_tree (t:'a tree) : cnt = 
   match t with
   | Bin(bi,_,_) -> bi.elm_cnt
@@ -80,8 +75,8 @@ let do_zip_cmd : 'a zip_cmd -> 'a zip_cmds =
 	 (match d with L -> {z with left =Cons(a, Lev(lev, rest))}
 		     | R -> {z with right=Cons(a, Lev(lev, rest))})
       | Move(_) -> 
-	 (match d with L -> {z with left =rest; lev=lev; right=Cons(elm,Lev(z.lev,z.right))}
-		     | R -> {z with right=rest; lev=lev; left =Cons(elm,Lev(z.lev,z.left ))})))
+	 (match d with L -> {left =rest; lev=lev; right=Cons(elm,Lev(z.lev,z.right))}
+		     | R -> {right=rest; lev=lev; left =Cons(elm,Lev(z.lev,z.left ))})))
 
 let rec append (t1:'a tree) (t2:'a tree) : 'a tree =
   let elm_cnt = (elm_cnt_of_tree t1) + (elm_cnt_of_tree t2) in
@@ -118,6 +113,32 @@ let append_all (d:dir) (trees:'a tlist) : 'a tree =
 let unfocus (z: 'a zip) : 'a tree = 
   append (append_all L z.left) 
 	 (append (tree_of_lev z.lev) (append_all R z.right))
+
+(*
+let focus (tree:'a tree) (pos:int) : 'a zip =
+  let rec loop (tree:'a tree) (pos:int) (ll:('a llist) option) (lr:('a llist) option) =
+    match tree with
+    | Bin(bi, tl, tr) -> 
+       let cl = elm_cnt_of_tree tl in
+       let cons t = function None ->  | Some(l) -> Some(Tree(t, l))
+
+       if      pos = cl then {lev=bi.lev; left=cons tl ll; right=cons tr lr}
+       else if pos < cl then loop tl pos        ll (lev_cons bi.lev tr lr)
+       else if pos > cl then loop tr (pos - cl) (lev_cons bi.lev tl ll) lr
+       else failwith "impossible"
+    | _ -> failwith "illegal argument"
+  in
+  let elm_cnt = elm_cnt_of_tree tree in
+  let pos = if      pos >= elm_cnt then elm_cnt
+	    else if pos < 0        then 0 
+	    else    pos in
+  match tree with 
+  | Nil     -> failwith "illegal argument"
+  | Leaf(_) -> failwith "illegal argument"
+  | Bin(a, Nil, Nil)                 -> {left=Nil; lev=a.lev; right=Nil}
+  | Bin(a, Bin(b, Nil, Leaf(x)), t3) -> {left=Nil; 
+ *)
+     
 
 (* let rec focus : 'a tree -> int -> 'a raz = *)
 (*   fun t p -> (\* first a top-level bounds check *\) *)
