@@ -1,3 +1,6 @@
+(* This version of the RAZ places levels, not elements, at the center
+   of the zipper's cursor *)
+
 type lev      = int
 type cnt      = int
 type dir      = L | R
@@ -17,10 +20,10 @@ let empty (l:lev) : 'a zip =
 let tree_of_lev (l:lev) : 'a tree = 
   Bin({lev=l;elm_cnt=0},Nil,Nil)
 
-let singleton_elm_zip (le:lev) (e:'a) (lc:lev) (d:dir) : 'a zip = 
-  match d with
-  | L -> {left=Cons(e,Lev(le,Nil));lev=lc;right=Nil}
-  | R -> {left=Nil;lev=lc;right=Cons(e,Lev(le,Nil))}
+(* let zip_of_elm (le:lev) (e:'a) (lc:lev) (d:dir) : 'a zip =  *)
+(*   match d with *)
+(*   | L -> {left=Cons(e,Lev(le,Nil));lev=lc;right=Nil} *)
+(*   | R -> {left=Nil;lev=lc;right=Cons(e,Lev(le,Nil))} *)
 
 let elm_cnt_of_tree (t:'a tree) : cnt = 
   match t with
@@ -66,7 +69,7 @@ let do_zip_cmd : 'a zip_cmd -> 'a zip_cmds =
       | R -> trim L z.right
     in
     match trimmed with 
-    | None -> z
+    | None -> z (* do nothing *)
     | Some((elm, Lev(lev, rest))) -> (
       match cmd with 
       | Insert _ -> failwith "impossible"
@@ -77,8 +80,8 @@ let do_zip_cmd : 'a zip_cmd -> 'a zip_cmds =
 	 (match d with L -> {z with left =Cons(a, Lev(lev, rest))}
 		     | R -> {z with right=Cons(a, Lev(lev, rest))})
       | Move(_) -> 
-	 (match d with L -> {z with left =rest; right=Cons(elm,Lev(lev,z.right))}
-		     | R -> {z with right=rest; left =Cons(elm,Lev(lev,z.left ))})))
+	 (match d with L -> {z with left =rest; lev=lev; right=Cons(elm,Lev(z.lev,z.right))}
+		     | R -> {z with right=rest; lev=lev; left =Cons(elm,Lev(z.lev,z.left ))})))
 
 let rec append (t1:'a tree) (t2:'a tree) : 'a tree =
   let elm_cnt = (elm_cnt_of_tree t1) + (elm_cnt_of_tree t2) in
