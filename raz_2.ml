@@ -25,7 +25,7 @@ There are some differences with the earlier version:
   work is needed to see how focus/unfocus/trim connect the invariant
   about the full tree to that of the trimmed subtrees.
 
-- This version is even shorter: 126 lines, not counting these comments.
+- This version is even shorter: 123 lines, not counting these comments.
 
 - Unlike the earlier version, this one is untested / unmeasured. (!)
 
@@ -57,22 +57,18 @@ let elm_cnt_of_tree (t:'a tree) : cnt =
 let trim (d:dir) (t:'a elms) : ('a * lev * 'a elms) option =
   match t with
   | Cons(a, lev, elms) -> Some((a, lev, elms))
-  | Trees([])          -> None
-  | Trees(tree::trees) -> 
-     let rec loop (t:'a tree) (lo:lev option) (trees:('a tree)list ) 
-	     : ('a * lev * 'a elms) option =
-       match t, lo with
-       | Nil, _                  -> (match trees with [] -> None | tree::trees -> loop tree lo trees)
-       | Leaf(_), None           -> failwith "illegal argument" (* Violates Invariant: #Bins = #Leaves + 1. TODO/??? *)
-       | Leaf(a), Some(lev)      -> Some((a, lev, Trees(trees)))
-       | Bin(bi, left, right), _ -> 
-	  let trees = match lo with None      -> trees
-				  | Some(lev) -> (tree_of_lev lev) :: trees
-	  in
-	  match d with
-	  | L -> loop left  (Some bi.lev) (right :: trees)
-	  | R -> loop right (Some bi.lev) (left  :: trees)
-     in loop tree None trees
+  | Trees(trees) -> 
+     let rec loop (ts:('a tree) list) (st:'a option) : ('a * lev * 'a elms) option =
+       match ts, st with
+       | [],                       _      -> None
+       | Nil::trees,               _      -> loop trees st
+       | Leaf(x)::trees,           None   -> loop trees (Some x)
+       | Leaf(_)::_,               Some _ -> failwith "illegal argument"
+       | Bin(bi, Nil, Nil)::trees, Some x -> Some(x, bi.lev, Trees(trees))
+       | Bin(bi, l, r)::trees, _          ->
+	  match d with L -> loop (l::(tree_of_lev bi.lev :: r :: trees)) st 
+		     | R -> loop (r::(tree_of_lev bi.lev :: l :: trees)) st
+     in loop trees None
 		       
 type 'a zip_cmd =
   | Insert  of dir * 'a * lev
