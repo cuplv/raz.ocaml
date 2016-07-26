@@ -8,11 +8,11 @@ closely based on the OCaml implementation by Kyle Headley, and the
 There are some differences with the earlier version:
 
 - This RAZ version places levels, not elements, at the center of the
-  zipper's cursor.  An invariant it enjoys is that #elements = #levels
+  zipper's cursor.  It enjoys the invariant that #elements = #levels
   + 1, where #levels >= 1, and #elements >= 0. 
 
-  The chief consequence of this representation is that it can capture
-  empty sequences, with zero elements; the prior version required
+  The chief consequence of this representation is that it captures
+  empty sequences with zero elements; the prior version required
   special sentinel elements at the ends to represent an empty
   sequence.  Here, we implement sentinels with levels, not special
   sequence elements.
@@ -21,24 +21,26 @@ There are some differences with the earlier version:
   some structural invariants about the presence of levels and trees in
   the zipper.  In particular: 
 
-    * The type enforces that #levels = #elements + 1, across all of
+    * The types enforce that #levels = #elements + 1, across all of
       the Cons cells of the zipper, and its centered cursor level.
 
-    * The type enforces that levels and elements interleave, and that
+    * The types enforce that levels and elements interleave, and that
       a level follows each element, which can play the role of the
       "sentinel" if this element is the last/first one in the
       sequence.
 
-    * Note that this enforcement does not cover the invariants for
-      trees, only the center of the zipper and its Cons cells.
+  Note that this enforcement does not cover the invariants for trees,
+  only the center of the zipper and its Cons cells.  Perhaps future
+  verisons can use refinement types (or stronger dependent types) to
+  capture the invariants over trees and tree lists. (Not all of these
+  invariants are apparent to me yet).
 
-- We state, but do not statically enforce, that the unfocused tree
-  also has that #levels = #elements + 1.  However: The invariants for
-  trees in the zipper are not yet clear to me.  More work is needed to
-  see how focus/unfocus/trim connect the invariant about the full tree
-  to that of the trimmed subtrees.
+- We assume, but do not statically enforce, that the unfocused tree
+  also has that #levels = #elements + 1.  More work is needed to see
+  how focus/unfocus/trim connect the invariant about the full tree to
+  that of the trimmed subtrees.
 
-- This version is even shorter: 
+- This version of the RAZ is a little shorter than the prior one:
   The Raz module body consists of ~120 lines 
   (not counting these comments or the module type RAZ).
 
