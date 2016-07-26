@@ -1,15 +1,45 @@
-(* This version of the RAZ places levels, not elements, at the center
-   of the zipper's cursor *)
+(* 
+Matthew A. Hammer (matthew.hammer@colorado.edu).
+
+This is an implementation of the Random Access Zipper (RAZ).  It is
+closely based on the OCaml implementation by Kyle Headley, and the
+2016 article by Headley and Hammer.
+
+There are some differences with the earlier version:
+
+- This RAZ version places levels, not elements, at the center of the
+  zipper's cursor.  An invariant it enjoys is that #elements = #levels
+  + 1, where #levels >= 1, and #elements >= 0. The chief consequence
+  is that this representation (compared to the prior version) can
+  capture empty sequences, with zero elements.
+
+- This RAZ version uses the OCaml type system to attempt to enforce
+  some structural invariants about the presence of levels and trees in
+  the zipper.  In particular: The type enforces that #levels =
+  #elements + 1, across all of these Cons cells, and the centered
+  cursor.  Note that this does not capture the invariant for trees.
+
+- We state, but do not statically enforce, that the unfocused tree
+  also has this #levels = #elements + 1 property.  However: The
+  invariants for trees in the zipper are not yet clear to me.  More
+  work is needed to see how focus/unfocus/trim connect the invariant
+  about the full tree to that of the trimmed subtrees.
+
+- This version is even shorter: 126 lines, not counting these comments.
+
+- Unlike the earlier version, this one is untested / unmeasured. (!)
+
+ *)
 
 type lev      = int
 type cnt      = int
 type dir      = L | R
 type bin_info = { lev:lev; elm_cnt:cnt }
-type 'a tree  = Bin  of bin_info * 'a tree * 'a tree
-	      | Leaf of 'a
-	      | Nil
+type 'a tree  = Bin  of bin_info * 'a tree * 'a tree (* Invariant: Levels of sub-trees are less-or-than-equal-to Bin's level *)
+	      | Leaf of 'a (* Invariant: There are N+1 Bin nodes in every tree with N leaves. *)
+	      | Nil (* Unfocused invariant: Exactly two Nils, the leftmost/rightmost terminals of the (unfocused) tree. *)
 type 'a elms  = Cons of 'a * lev * 'a elms (* Invariant: element always followed by a level *)
-	      | Trees of ('a tree) list    (* Invariant: trees not interposed with elements/levels *)
+	      | Trees of ('a tree) list    (* Invariant: trees not interposed with elements/levels. trim transforms this list. *)
 type 'a zip   = { left:'a elms; lev:lev; right:'a elms}
 
 let empty (l:lev) : 'a zip = 
@@ -32,8 +62,8 @@ let trim (d:dir) (t:'a elms) : ('a * lev * 'a elms) option =
      let rec loop (t:'a tree) (lo:lev option) (trees:('a tree)list ) 
 	     : ('a * lev * 'a elms) option =
        match t, lo with
-       | Nil, _                  -> failwith "poorly formed tree"
-       | Leaf(_), None           -> failwith "poorly formed tree"
+       | Nil, _                  -> (match trees with [] -> None | tree::trees -> loop tree lo trees)
+       | Leaf(_), None           -> failwith "illegal argument" (* Violates Invariant: #Bins = #Leaves + 1. TODO/??? *)
        | Leaf(a), Some(lev)      -> Some((a, lev, Trees(trees)))
        | Bin(bi, left, right), _ -> 
 	  let trees = match lo with None      -> trees
@@ -54,29 +84,27 @@ type 'a zip_cmds = 'a zip -> 'a zip
 let do_zip_cmd : 'a zip_cmd -> 'a zip_cmds =
   function
   | Insert (d,a,lev) -> (
-     match d with
-     | L -> fun z -> {z with left  = Cons(a, lev, z.left )}
-     | R -> fun z -> {z with right = Cons(a, lev, z.right)}
+    match d with
+    | L -> fun z -> {z with left  = Cons(a, lev, z.left )}
+    | R -> fun z -> {z with right = Cons(a, lev, z.right)}
   )
-  | ( Remove (d)
-    | Replace(d,_)
-    | Move   (d) ) as cmd -> (
+  | ( Remove (d) | Replace(d,_) | Move (d) ) as trim_cmd -> (
     fun z ->
     let trimmed = match d with
       | L -> trim L z.left
       | R -> trim L z.right
     in
     match trimmed with
-    | None -> z (* do nothing *)
+    | None -> z (* do nothing; nothing to remove/replace/move *)
     | Some((elm, lev, rest)) -> (
-      match cmd with
-      | Insert _ -> failwith "impossible"
+      match trim_cmd with
+      | Insert _ -> failwith "impossible" (* Already handled, above. *)
       | Remove(_) ->
-	 (match d with L -> {z with left =rest}
-		     | R -> {z with right=rest})
+	 (match d with L -> {z with left =rest}  (* Removes elm and lev. *)
+		     | R -> {z with right=rest}) (* Removes elm and lev. *)
       | Replace(_, a) ->
-	 (match d with L -> {z with left =Cons(a, lev, rest)}
-		     | R -> {z with right=Cons(a, lev, rest)})
+	 (match d with L -> {z with left =Cons(a, lev, rest)}  (* Replaces elm with a. *)
+		     | R -> {z with right=Cons(a, lev, rest)}) (* Replaces elm with a. *)
       | Move(_) ->
 	 (match d with L -> {left =rest; lev=lev; right=Cons(elm,z.lev,z.right)}
 		     | R -> {right=rest; lev=lev; left =Cons(elm,z.lev,z.left )})))
@@ -86,7 +114,7 @@ let rec append (t1:'a tree) (t2:'a tree) : 'a tree =
   match t1, t2 with
   | Nil, _ -> t2
   | _, Nil -> t1
-  | Leaf(_), Leaf(_)       -> failwith "illegal argument: Leaf-Leaf case not handled"
+  | Leaf(_), Leaf(_)       -> failwith "invalid argument" (* Violates: ???/TODO *)
   | Leaf(a), Bin(bi, l, r) -> Bin({lev=bi.lev;elm_cnt=elm_cnt}, append t1 l, r)
   | Bin(bi, l, r), Leaf(a) -> Bin({lev=bi.lev;elm_cnt=elm_cnt}, l, append r t2)
   | Bin(bi1, l1, r1),
@@ -114,62 +142,49 @@ let unfocus (z: 'a zip) : 'a tree =
   append (tree_of_elms L Nil                 z.left ) 
 	 (tree_of_elms R (tree_of_lev z.lev) z.right)
 
-(*
-let focus (tree:'a tree) (pos:int) : 'a zip =
-  let rec loop (tree:'a tree) (pos:int) (ll:('a llist) option) (lr:('a llist) option) =
-    match tree with
-    | Bin(bi, tl, tr) -> 
-       let cl = elm_cnt_of_tree tl in
-       let cons t = function None ->  | Some(l) -> Some(Tree(t, l))
-
-       if      pos = cl then {lev=bi.lev; left=cons tl ll; right=cons tr lr}
-       else if pos < cl then loop tl pos        ll (lev_cons bi.lev tr lr)
-       else if pos > cl then loop tr (pos - cl) (lev_cons bi.lev tl ll) lr
-       else failwith "impossible"
-    | _ -> failwith "illegal argument"
+let focus (tree:'a tree) (pos:int) : 'a zip =  
+  let pos = let n = elm_cnt_of_tree tree in 
+	    if pos > n then n else if pos < 0 then 0 else pos
   in
-  let elm_cnt = elm_cnt_of_tree tree in
-  let pos = if      pos >= elm_cnt then elm_cnt
-	    else if pos < 0        then 0 
-	    else    pos in
-  match tree with 
-  | Nil     -> failwith "illegal argument"
-  | Leaf(_) -> failwith "illegal argument"
-  | Bin(a, Nil, Nil)                 -> {left=Nil; lev=a.lev; right=Nil}
-  | Bin(a, Bin(b, Nil, Leaf(x)), t3) -> {left=Nil; 
- *)
+  let rec loop (tree:'a tree) (tsl:('a tree) list) (tsr:('a tree) list) =
+    match tree with
+    | Nil     -> failwith "invalid argument" (* Violates: #Bins = #Leaves + 1 *)
+    | Leaf(x) -> failwith "invalid argument" (* Violates: #Bins = #Leaves + 1 *)
+    | Bin(bi,l,r) -> (
+      let cl = elm_cnt_of_tree l in
+      if pos = cl then {lev=bi.lev; left=Trees(l::tsl); right=Trees(r::tsr)}
+      else if pos < cl then loop l     (Bin({lev=bi.lev; elm_cnt=elm_cnt_of_tree r},Nil,l)::tsl) tsr
+      else                  loop r tsl (Bin({lev=bi.lev; elm_cnt=cl               },l,Nil)::tsr)
+    )
+  in loop tree [] []
 
-(* Count valid instances:
+(* 
 
-0: a
-Bin(a, Nil, Nil)
+Count valid instances, for small sizes 0, 1, ..:
+ names    a,b,c, ...
+ elements x,y,z, ...
 
-1: a x b
-Bin(b, Bin(a, Nil, Leaf(x)), Nil)
-Bin(a, Nil, Bin(b, Leaf(x), Nil))
+Size 0: 
+ Seq:    a
+ #Trees: 1
+ Tree:   Bin(a, Nil, Nil)
 
-2: a x b y c
-Bin(a, Bin(b, Nil, Leaf(x)), Nil)
-Bin(a, Nil, Bin(b, Leaf(x), Nil))
+Size 1: 
+ Seq:    a x b
+ #Trees: 1 + 1 = 2
 
+ Tree 1: Bin(b, Bin(a, Nil, Leaf(x)), Nil)
+ Tree 2: Bin(a, Nil, Bin(b, Leaf(x), Nil))
 
+Size 2: 
+ Seq:    a x b y c
+ #Trees: 2 + 1 + 2 = 5
 
- *)
+Size 3:
+ Seq:    a x b y c z d
+ #Trees  5 + 2 + 2 + 5 = 13 
 
-(* let rec focus : 'a tree -> int -> 'a raz = *)
-(*   fun t p -> (\* first a top-level bounds check *\) *)
-(*   let c = item_count t in *)
-(*   if p >= c then focus t (c - 1) else *)
-(*   if p < 0 then focus t 0 else *)
-(*   let rec focus : 'a tree -> int -> ('a tlist * 'a tlist) -> 'a raz = *)
-(*     fun t p (l,r) -> match t with *)
-(*     | Nil -> failwith "internal Nil" *)
-(*     | Leaf(elm) ->  *)
-(*       assert (p == 0); *)
-(*       (l,elm,r) *)
-(*     | Bin(lv, _, bl, br) ->  *)
-(*       let c = item_count bl in *)
-(*       if p < c *)
-(*       then focus bl p (l,Level(lv,Tree(br,r))) *)
-(*       else focus br (p - c) (Level(lv,Tree(bl,l)),r) *)
-(*   in focus t p (Nil,Nil) *)
+  x    0 1 2 3 4 5 6
+Fib x  1 1 2 3 5 8 13
+Fib 2x 1 2 5 13
+*)
