@@ -9,21 +9,34 @@ There are some differences with the earlier version:
 
 - This RAZ version places levels, not elements, at the center of the
   zipper's cursor.  An invariant it enjoys is that #elements = #levels
-  + 1, where #levels >= 1, and #elements >= 0. The chief consequence
-  is that this representation (compared to the prior version) can
-  capture empty sequences, with zero elements.
+  + 1, where #levels >= 1, and #elements >= 0. 
+
+  The chief consequence of this representation is that it can capture
+  empty sequences, with zero elements; the prior version required
+  special sentinel elements at the ends to represent an empty
+  sequence.  Here, we implement sentinels with levels, not special
+  sequence elements.
 
 - This RAZ version uses the OCaml type system to attempt to enforce
   some structural invariants about the presence of levels and trees in
-  the zipper.  In particular: The type enforces that #levels =
-  #elements + 1, across all of these Cons cells, and the centered
-  cursor.  Note that this does not capture the invariant for trees.
+  the zipper.  In particular: 
+
+    * The type enforces that #levels = #elements + 1, across all of
+      the Cons cells of the zipper, and its centered cursor level.
+
+    * The type enforces that levels and elements interleave, and that
+      a level follows each element, which can play the role of the
+      "sentinel" if this element is the last/first one in the
+      sequence.
+
+    * Note that this enforcement does not cover the invariants for
+      trees, only the center of the zipper and its Cons cells.
 
 - We state, but do not statically enforce, that the unfocused tree
-  also has this #levels = #elements + 1 property.  However: The
-  invariants for trees in the zipper are not yet clear to me.  More
-  work is needed to see how focus/unfocus/trim connect the invariant
-  about the full tree to that of the trimmed subtrees.
+  also has that #levels = #elements + 1.  However: The invariants for
+  trees in the zipper are not yet clear to me.  More work is needed to
+  see how focus/unfocus/trim connect the invariant about the full tree
+  to that of the trimmed subtrees.
 
 - This version is even shorter: 
   The Raz module body consists of ~120 lines 
@@ -87,7 +100,7 @@ module Raz : RAZ = struct
 	 | [],                       _      -> None
 	 | Nil::trees,               _      -> loop trees st
 	 | Leaf(x)::trees,           None   -> loop trees (Some x)
-	 | Leaf(_)::_,               Some _ -> failwith "illegal argument"
+	 | Leaf(_)::_,               Some _ -> failwith "illegal argument" (* leaf-leaf case: Violates Invariant that elements and levels interleave. *) 
 	 | Bin(bi, Nil, Nil)::trees, Some x -> Some(x, bi.lev, Trees(trees))
 	 | Bin(bi, l, r)::trees, _          ->
 	    match d with L -> loop (l::(tree_of_lev bi.lev :: r :: trees)) st 
@@ -134,7 +147,7 @@ module Raz : RAZ = struct
     match t1, t2 with
     | Nil, _ -> t2
     | _, Nil -> t1
-    | Leaf(_), Leaf(_)       -> failwith "invalid argument" (* Violates: ???/TODO *)
+    | Leaf(_), Leaf(_)       -> failwith "invalid argument" (* leaf-leaf case: Violates invariant that elements and levels interleave. *)
     | Leaf(a), Bin(bi, l, r) -> Bin({lev=bi.lev;elm_cnt=elm_cnt}, append t1 l, r)
     | Bin(bi, l, r), Leaf(a) -> Bin({lev=bi.lev;elm_cnt=elm_cnt}, l, append r t2)
     | Bin(bi1, l1, r1),
