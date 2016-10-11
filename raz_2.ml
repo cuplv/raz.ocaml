@@ -54,19 +54,17 @@ module type RAZ =
     type 'a zip
     type lev    = int
     type dir    = L | R
-    type 'a cmd =
-      | Insert  of dir * 'a * lev
+    type 'a cmd (*[X]*) =
+      | Insert  of dir * 'a * lev (*[X]*)
       | Remove  of dir
       | Replace of dir * 'a
       | Move    of dir
 		     
-    type 'a cmds = 'a zip -> 'a zip
-				    
-    val empty  : lev -> 'a zip
-    val do_cmd : 'a cmd -> 'a cmds
+    val empty  : lev(*[X]*) -> 'a zip (*[X;0]*)
+    val do_cmd : 'a cmd (*[X1]*) -> 'a zip (*[X2;Y]*) -> 'a zip (*[X1*X2;M(X1)*Y]*)   (* <<< M~X1 is written, but not Y *) 
 				      
-    val unfocus : 'a zip -> 'a tree
-    val focus   : 'a tree -> int -> 'a zip
+    val unfocus : 'a zip (*[X;Y]*) -> 'a tree (*[X;M(X)*Y]*)        (* <<< M(X) is written (where M is namespace); Y is not *written*, it is reused. *)
+    val focus   : 'a tree (*[X;Y]*) -> int -> 'a zip (*[X;M(X)*Y]*)   (* <<< "" *)
   end
 
 module Raz : RAZ = struct
@@ -81,10 +79,10 @@ module Raz : RAZ = struct
 		| Trees of ('a tree) list    (* Invariant: trees not interposed with elements/levels. trim transforms this list. *)
   type 'a zip   = { left:'a elms; lev:lev; right:'a elms}
 		    
-  let empty (l:lev) : 'a zip = 
+  let empty (l:lev(*[X]*)) : 'a zip(*[X;0]*) = 
     {left=Trees([]);lev=l;right=Trees([])}
       
-  let tree_of_lev (l:lev) : 'a tree = 
+  let tree_of_lev (l:lev(*[X]*)) : 'a tree(*[X;0]*) = 
     Bin({lev=l;elm_cnt=0},Nil,Nil)
        
   let elm_cnt_of_tree (t:'a tree) : cnt = 
@@ -93,11 +91,11 @@ module Raz : RAZ = struct
     | Leaf(_)     -> 1
     | Nil         -> 0
 		       
-  let trim (d:dir) (t:'a elms) : ('a * lev * 'a elms) option =
+  let trim (d:dir) (t:'a elms(*[X1*X2;Y]*)) : ('a * lev(*[X1]*) * 'a elms(*[X2;Y]*)) option =
     match t with
     | Cons(a, lev, elms) -> Some((a, lev, elms))
     | Trees(trees) -> 
-       let rec loop (ts:('a tree) list) (st:'a option) : ('a * lev * 'a elms) option =
+       let rec loop (ts:('a tree(*[X3;Y3]*)) list) (st:'a option) : ('a * lev(*[X4]*) * 'a elms(*[X3*X4;Y3]*)) option =
 	 match ts, st with
 	 | [],                       _      -> None
 	 | Nil::trees,               _      -> loop trees st
@@ -144,7 +142,7 @@ module Raz : RAZ = struct
 	   (match d with L -> {left =rest; lev=lev; right=Cons(elm,z.lev,z.right)}
 		       | R -> {right=rest; lev=lev; left =Cons(elm,z.lev,z.left )})))
 								
-  let rec append (t1:'a tree) (t2:'a tree) : 'a tree =
+  let rec append (t1:'a tree (*[X1;Y1]*)) (t2:'a tree(*[X2;Y2]*)) : 'a tree(*[X1*X2;M(X1*X2)*(Y1*Y2)]*) =
     let elm_cnt = (elm_cnt_of_tree t1) + (elm_cnt_of_tree t2) in
     match t1, t2 with
     | Nil, _ -> t2
@@ -157,7 +155,7 @@ module Raz : RAZ = struct
 			  then Bin({lev=bi1.lev;elm_cnt=elm_cnt}, l1, append r1 t2)
 			  else Bin({lev=bi2.lev;elm_cnt=elm_cnt}, append t1 l2, r2)
 				  
-  let rec tree_of_trees (d:dir) (tree:'a tree) (trees:('a tree)list) : 'a tree =
+  let rec tree_of_trees (d:dir) (tree:'a tree(*[X1;Y1]*)) (trees:('a tree(*[X2;Y2]*))list(*[;]*)) : 'a tree (*[X1*X2;M(X1*X2)*(Y1*Y2)]*) =
     match trees with
     | [] -> tree
     | tree2::trees -> 
@@ -197,7 +195,7 @@ end
 (* 
 
 Count valid instances, for small sizes 0, 1, ..:
- names    a,b,c, ...
+ levels   a,b,c, ...
  elements x,y,z, ...
 
 Size 0: 
