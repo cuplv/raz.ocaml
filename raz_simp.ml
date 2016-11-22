@@ -27,8 +27,10 @@ let rnd_level : unit -> lev =
   in
   ffs (Random.bits())
 
+(* minimum raz with initial element *)
 let singleton e = (Nil,e,Nil)
-let empty n = (Level(rnd_level(),Cons(n,Nil)),n,Nil)
+(* empty raz with sentinal values, focused on far right *)
+let empty sentinel = (Level(rnd_level(),Cons(sentinel,Nil)),sentinel,Nil)
 
 let item_count : 'a tree -> cnt =
   fun t -> match t with

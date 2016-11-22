@@ -100,7 +100,7 @@ module Raz : RAZ = struct
 	 | [],                       _      -> None
 	 | Nil::trees,               _      -> loop trees st
 	 | Leaf(x)::trees,           None   -> loop trees (Some x)
-	 | Leaf(_)::_,               Some _ -> failwith "illegal argument" (* leaf-leaf case: Violates Invariant that elements and levels interleave. *) 
+	 | Leaf(_)::_,               Some _ -> failwith "illegal argument: trim: leaf-leaf" (* leaf-leaf case: Violates Invariant that elements and levels interleave. *)
 	 | Bin(bi, Nil, Nil)::trees, Some x -> Some(x, bi.lev, Trees(trees))
 	 | Bin(bi, l, r)::trees, _          ->
 	    match d with L -> loop (l::(tree_of_lev bi.lev :: r :: trees)) st 
@@ -147,7 +147,7 @@ module Raz : RAZ = struct
     match t1, t2 with
     | Nil, _ -> t2
     | _, Nil -> t1
-    | Leaf(_), Leaf(_)       -> failwith "invalid argument" (* leaf-leaf case: Violates invariant that elements and levels interleave. *)
+    | Leaf(_), Leaf(_)       -> failwith "invalid argument: append: leaf-leaf" (* leaf-leaf case: Violates invariant that elements and levels interleave. *)
     | Leaf(a), Bin(bi, l, r) -> Bin({lev=bi.lev;elm_cnt=elm_cnt}, append t1 l, r)
     | Bin(bi, l, r), Leaf(a) -> Bin({lev=bi.lev;elm_cnt=elm_cnt}, l, append r t2)
     | Bin(bi1, l1, r1),
@@ -181,8 +181,8 @@ module Raz : RAZ = struct
     in
     let rec loop (tree:'a tree) (tsl:('a tree) list) (tsr:('a tree) list) =
       match tree with
-      | Nil     -> failwith "invalid argument" (* Violates: #Bins = #Leaves + 1 *)
-      | Leaf(x) -> failwith "invalid argument" (* Violates: #Bins = #Leaves + 1 *)
+      | Nil     -> failwith "invalid argument: focus: nil" (* Violates: #Bins = #Leaves + 1 *)
+      | Leaf(x) -> failwith "invalid argument: focus: leaf" (* Violates: #Bins = #Leaves + 1 *)
       | Bin(bi,l,r) -> (
 	let cl = elm_cnt_of_tree l in
 	if pos = cl then {lev=bi.lev; left=Trees(l::tsl); right=Trees(r::tsr)}
