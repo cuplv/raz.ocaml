@@ -103,38 +103,77 @@ module Raz : RAZ = struct
   type 'a zip   = { left:'a elms; lev:lev; right:'a elms}
   [@@deriving show]
 
-  (* wf_zip: Predicate for testing the well-formedness of the zipper: 
-     Holds iff the invariants hold. 
+  module Wf = struct
+    (* The Wf module consists of predicates for testing the
+     well-formedness of the zipper and unfocused tree.  These
+     predicates hold iff the invariants hold.
 
-    Invariant: Nils are permitted only at the endpoints of the unfocused tree representation.
-    Further, they *must* be there.  If they are not— if the endpoints consist of a Leaf, with a sequence element— 
-    then the invariant is broken that the sequence starts and ends with levels, 
-    the thing on which we are permitted to place the focus.  Suppose the endpoints are Leafs (sequence elements),
-    then we cannot ever place the focus earlier or later, to insert an element at the start or end, respectively.      
+    Invariant 1: 
+       Nils are permitted only at the endpoints of the
+    unfocused tree representation.  Further, they *must* be there.  If
+    they are not— if the endpoints consist of a Leaf, with a sequence
+    element— then the invariant is broken that the sequence starts and
+    ends with levels, the thing on which we are permitted to place the
+    focus.
+
+    Invariant 1 discussion:
+
+    To see the importance of invariant 1, suppose that it is broken,
+    and the endpoints are Leafs (sequence elements).  Now, we cannot
+    ever place the focus earlier or later, to insert an element at the
+    start or end, respectively.  This is because we choose to focus on
+    levels, not sequence elements.
+
+    Aside: Suppose now that we focus on sequence elements, not levels.
+    Now we cannot easily represent an empty, focused sequence, since
+    the focus is placed on an element, making the sequence non-empty.
+
+    - - - - - - - - - - - - - 
+
+    TODO: Capture the level-related invariants (\dagger).
+    TODO: Capture the invariants about the zipper (\dagger\dagger).
+
+    \dagger: Currently, we only capture the other structural
+    invariants about where Nils are permitted, and thus, about the
+    alternation of sequence elements and levels.
+
+    \daggar\dagger: Currently, we only capture the invariants about
+    the unfocused tree.  There should be invariants about the list of
+    trees in the zipper as well (regarding where Nils are permitted).
+
+     *)
+
+  (* The tree_dir_op invariant is inductive, over the structure of the tree.
+
+    Beyond the tree, it is parameterized by an optional direction,
+    which can take on one of three possible values.  The value of
+    this dir option parameter affects where Nils are permitted in the tree:
 
     (dir_op = Some L) means: There *must* be a Nil at the left-most position 
     (dir_op = Some R) means: There *must* be a Nil at the right-most position
     (dir_op = None)   means: There *must not* be a Nil anywhere within the tree.
    *)
 	
-
-  let rec wf_tree_dir_op dir_op t =
+  let rec tree_dir_op dir_op t =
     match dir_op, t with
     | None    , Nil              -> false (* Broken invariant: *)
-    | Some _  , Leaf _           -> false (* Broken invariant: *)    
+    | Some _  , Leaf _           -> false (* Broken invariant: *)
     | Some _  , Nil              -> true
     | None    , Leaf _           -> true
-    | (Some L), Bin(_, Nil, r  ) -> wf_tree_dir_op None r
-    | (Some R), Bin(_,  l, Nil ) -> wf_tree_dir_op None l
-    | None    , Bin(_,  l,  r  ) -> (wf_tree_dir_op None l)     && (wf_tree_dir_op None     r)
-    | (Some L), Bin(_,  l,  r  ) -> (wf_tree_dir_op (Some L) l) && (wf_tree_dir_op None     r)
-    | (Some R), Bin(_,  l,  r  ) -> (wf_tree_dir_op None l)     && (wf_tree_dir_op (Some R) r)
+    | (Some L), Bin(_, Nil, r  ) -> tree_dir_op None r
+    | (Some R), Bin(_,  l, Nil ) -> tree_dir_op None l
+    | None    , Bin(_,  l,  r  ) -> (tree_dir_op None l)     && (tree_dir_op None     r)
+    | (Some L), Bin(_,  l,  r  ) -> (tree_dir_op (Some L) l) && (tree_dir_op None     r)
+    | (Some R), Bin(_,  l,  r  ) -> (tree_dir_op None l)     && (tree_dir_op (Some R) r)
 
-  let wf_unfocused_tree t =
+  let tree t =
     match t with
     | Nil          -> false (* Broken invariant: #levels = #leaves + 1 *)
     | Leaf _       -> false (* Broken invariant: #levels = #leaves + 1 *)
-    | Bin(_, l, r) -> (wf_tree_dir_op (Some L) l) && (wf_tree_dir_op (Some R) r)
+    | Bin(_, l, r) -> (tree_dir_op (Some L) l) && (tree_dir_op (Some R) r)
+  end
+		
+  let wf_unfocused_tree = Wf.tree
 
   let empty (l:lev(*[X]*)) : 'a zip(*[X;0]*) = 
     {left=Trees([]);lev=l;right=Trees([])}
@@ -212,17 +251,16 @@ module Raz : RAZ = struct
 			  then Bin ({lev=bi1.lev;elm_cnt=elm_cnt}, l1, append r1 t2)
 			  else Bin ({lev=bi2.lev;elm_cnt=elm_cnt}, append t1 l2, r2)
 				  
-  let rec tree_of_trees (d:dir) (trees:('a tree(*[X2;Y2]*))list(*[;]*)) : 'a tree (*[X1*X2;M(X1*X2)*(Y1*Y2)]*) =
+  let rec tree_of_trees (d:dir) (tree:'a tree) (trees:('a tree(*[X2;Y2]*))list(*[;]*)) : 'a tree (*[X1*X2;M(X1*X2)*(Y1*Y2)]*) =
     match trees with
     | [] -> Nil
-    | tree2::trees -> 
-       match d with (* Grown proceeds in direction `d`: either leftward (L) or rightward (R) *)
-       | L -> append (tree_of_trees d trees) tree2
-       | R -> append tree2 (tree_of_trees d trees)
+    | tree2::trees -> match d with (* Grown proceeds in direction `d`: either leftward (L) or rightward (R) *)
+		      | L -> tree_of_trees d (append tree2 tree) trees
+		      | R -> tree_of_trees d (append tree tree2) trees
 			    
   let rec tree_of_elms (d:dir) (elms:'a elms) : 'a tree =
     match elms with (* Grown proceeds in direction `d`: either leftward (L) or rightward (R) *)
-    | Trees(trees) -> tree_of_trees d trees
+    | Trees(trees) -> tree_of_trees d Nil trees
     | Cons(elm,lev,elms) -> (match d with
 			     | L -> append (tree_of_elms L elms) (append (tree_of_lev lev) (Leaf elm))
 			     | R -> append (append (Leaf elm) (tree_of_lev lev)) (tree_of_elms R elms)
