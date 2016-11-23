@@ -90,13 +90,13 @@ module type RAZ =
 module Raz : RAZ = struct
   type lev      = int
   [@@deriving show]
+  type elm_cnt  = int
+  [@@deriving show]
   type cnt      = int
   [@@deriving show]
   type dir      = L | R
   [@@deriving show]
-  type bin_info = { lev:lev; elm_cnt:cnt }
-  [@@deriving show]
-  type 'a tree  = Bin  of bin_info * 'a tree * 'a tree (* Invariant: Levels of sub-trees are less-or-than-equal-to Bin's level *)
+  type 'a tree  = Bin  of lev * elm_cnt * 'a tree * 'a tree (* Invariant: Levels of sub-trees are less-or-than-equal-to Bin's level *)
 		| Leaf of 'a (* Invariant: There are N+1 Bin nodes in every tree with N leaves. *)
 		| Nil (* Unfocused invariant: Exactly two Nils, the leftmost/rightmost terminals of the (unfocused) tree. *)
   [@@deriving show]
@@ -159,53 +159,54 @@ module Raz : RAZ = struct
 	
   let rec tree_dir_op dir_op t =
     match dir_op, t with
-    | None    , Nil              -> false (* Broken invariant: *)
-    | Some _  , Leaf _           -> false (* Broken invariant: *)
-    | Some _  , Nil              -> true
-    | None    , Leaf _           -> true
-    | (Some L), Bin(_, Nil, r  ) -> tree_dir_op None r
-    | (Some R), Bin(_,  l, Nil ) -> tree_dir_op None l
-    | None    , Bin(_,  l,  r  ) -> (tree_dir_op None l)     && (tree_dir_op None     r)
-    | (Some L), Bin(_,  l,  r  ) -> (tree_dir_op (Some L) l) && (tree_dir_op None     r)
-    | (Some R), Bin(_,  l,  r  ) -> (tree_dir_op None l)     && (tree_dir_op (Some R) r)
+    | None    , Nil                -> false (* Broken invariant: *)
+    | Some _  , Leaf _             -> false (* Broken invariant: *)
+    | Some _  , Nil                -> true
+    | None    , Leaf _             -> true
+    | (Some L), Bin(_,_, Nil, r  ) -> tree_dir_op None r
+    | (Some R), Bin(_,_,  l, Nil ) -> tree_dir_op None l
+    | None    , Bin(_,_,  l,  r  ) -> (tree_dir_op None l)     && (tree_dir_op None     r)
+    | (Some L), Bin(_,_,  l,  r  ) -> (tree_dir_op (Some L) l) && (tree_dir_op None     r)
+    | (Some R), Bin(_,_,  l,  r  ) -> (tree_dir_op None l)     && (tree_dir_op (Some R) r)
 
   let tree t =
     match t with
-    | Nil          -> false (* Broken invariant: #levels = #leaves + 1 *)
-    | Leaf _       -> false (* Broken invariant: #levels = #leaves + 1 *)
-    | Bin(_, l, r) -> (tree_dir_op (Some L) l) && (tree_dir_op (Some R) r)
-  end
+    | Nil            -> false (* Broken invariant: #levels = #leaves + 1 *)
+    | Leaf _         -> false (* Broken invariant: #levels = #leaves + 1 *)
+    | Bin(_,_, l, r) -> (tree_dir_op (Some L) l) && (tree_dir_op (Some R) r)
+
+  end (* End of Wf module. *)
 		
   let wf_unfocused_tree = Wf.tree
 
-  let empty (l:lev(*[X]*)) : 'a zip(*[X;0]*) = 
+  let empty (l:lev) : 'a zip = 
     {left=Trees([]);lev=l;right=Trees([])}
       
-  let tree_of_lev (l:lev(*[X]*)) : 'a tree(*[X;0]*) = 
-    Bin({lev=l;elm_cnt=0},Nil,Nil)
+  let tree_of_lev (l:lev) : 'a tree = 
+    Bin(l,0,Nil,Nil)
        
   let elm_cnt_of_tree (t:'a tree) : cnt = 
     match t with
-    | Bin(bi,_,_) -> bi.elm_cnt
-    | Leaf(_)     -> 1
-    | Nil         -> 0
+    | Bin(_,c,_,_) -> c
+    | Leaf(_)      -> 1
+    | Nil          -> 0
 	
   let elm_cnt t = elm_cnt_of_tree t
 	       
-  let trim (d:dir) (t:'a elms(*[X1*X2;Y]*)) : ('a * lev(*[X1]*) * 'a elms(*[X2;Y]*)) option =
+  let trim (d:dir) (t:'a elms) : ('a * lev * 'a elms) option =
     match t with
     | Cons(a, lev, elms) -> Some((a, lev, elms))
     | Trees(trees) -> 
-       let rec loop (ts:('a tree(*[X3;Y3]*)) list) (st:'a option) : ('a * lev(*[X4]*) * 'a elms(*[X3*X4;Y3]*)) option =
+       let rec loop (ts:('a tree) list) (st:'a option) : ('a * lev * 'a elms) option =
 	 match ts, st with
 	 | [],                       _      -> None
 	 | Nil::trees,               _      -> loop trees st
 	 | Leaf(x)::trees,           None   -> loop trees (Some x)
 	 | Leaf(_)::_,               Some _ -> failwith "illegal argument: trim: leaf-leaf" (* leaf-leaf case: Violates Invariant that elements and levels interleave. *)
-	 | Bin(bi, Nil, Nil)::trees, Some x -> Some(x, bi.lev, Trees(trees))
-	 | Bin(bi, l, r)::trees, _          ->
-	    match d with L -> loop (l::(tree_of_lev bi.lev :: r :: trees)) st 
-		       | R -> loop (r::(tree_of_lev bi.lev :: l :: trees)) st
+	 | Bin(lev,_, Nil, Nil)::trees, Some x -> Some(x, lev, Trees(trees))
+	 | Bin(lev,_, l, r)::trees, _          ->
+	    match d with L -> loop (l::(tree_of_lev lev :: r :: trees)) st 
+		       | R -> loop (r::(tree_of_lev lev :: l :: trees)) st
        in loop trees None
 	       
   type 'a cmd =
@@ -244,20 +245,21 @@ module Raz : RAZ = struct
 	   (match d with L -> {left =rest; lev=lev; right=Cons(elm,z.lev,z.right)}
 		       | R -> {right=rest; lev=lev; left =Cons(elm,z.lev,z.left )})))
 								
-  let rec append (t1:'a tree (*[X1;Y1]*)) (t2:'a tree(*[X2;Y2]*)) : 'a tree(*[X1*X2;M(X1*X2)*(Y1*Y2)]*) =
-    let elm_cnt = (elm_cnt_of_tree t1) + (elm_cnt_of_tree t2) in
+  let rec append (t1:'a tree) (t2:'a tree) : 'a tree =
     match t1, t2 with
     | Nil, _ -> t2
     | _, Nil -> t1
-    | Leaf(_), Leaf(_)       -> failwith "invalid argument: append: leaf-leaf" (* leaf-leaf case: Violates invariant that elements and levels interleave. *)
-    | Leaf(a), Bin(bi, l, r) -> Bin ({lev=bi.lev;elm_cnt=elm_cnt}, append t1 l, r)
-    | Bin(bi, l, r), Leaf(a) -> Bin ({lev=bi.lev;elm_cnt=elm_cnt}, l, append r t2)
-    | Bin(bi1, l1, r1),
-      Bin(bi2, l2, r2) -> if bi1.lev >= bi2.lev
-			  then Bin ({lev=bi1.lev;elm_cnt=elm_cnt}, l1, append r1 t2)
-			  else Bin ({lev=bi2.lev;elm_cnt=elm_cnt}, append t1 l2, r2)
+    | Leaf(_), Leaf(_)        -> failwith "invalid argument: append: leaf-leaf" (* leaf-leaf case: Violates invariant that elements and levels interleave. *)
+    | Leaf(a), Bin(lev,c,l,r) -> Bin (lev,c+1, append t1 l, r)
+    | Bin(lev,c,l,r), Leaf(a) -> Bin (lev,c+1, l, append r t2)
+    | Bin(lev1,_, l1, r1),
+      Bin(lev2,_, l2, r2) -> 
+       let elm_cnt = (elm_cnt_of_tree t1) + (elm_cnt_of_tree t2) in
+       if lev1 >= lev2
+       then Bin(lev1, elm_cnt, l1, append r1 t2)
+       else Bin(lev2, elm_cnt, append t1 l2, r2)
 				  
-  let rec tree_of_trees (d:dir) (tree:'a tree) (trees:('a tree(*[X2;Y2]*))list(*[;]*)) : 'a tree (*[X1*X2;M(X1*X2)*(Y1*Y2)]*) =
+  let rec tree_of_trees (d:dir) (tree:'a tree) (trees:('a tree)list) : 'a tree =
     match trees with
     | [] -> tree
     | tree2::trees -> match d with (* Grown proceeds in direction `d`: either leftward (L) or rightward (R) *)
@@ -272,26 +274,22 @@ module Raz : RAZ = struct
 			     | R -> tree_of_elms R (append tree (append (Leaf elm) (tree_of_lev lev))     ) elms
 			    )
 			   
-  let unfocus (z: 'a zip) : 'a tree =      
-    append (tree_of_elms L Nil z.left) 
-	   (append (tree_of_lev z.lev)
-		   (tree_of_elms R Nil z.right))
+  let unfocus (z: 'a zip) : 'a tree =
+    append (tree_of_elms L Nil z.left) (append (tree_of_lev z.lev) (tree_of_elms R Nil z.right))
 	   
-  let focus (tree:'a tree) (pos:int) : 'a zip =  
-    (* Input sanitization: Force position to be defined within the tree, in range [0, elm-count(tree)]. *)
-    let pos = let n = elm_cnt_of_tree tree in 
+  let focus (tree:'a tree) (pos:int) : 'a zip =      
+    let pos = let n = elm_cnt_of_tree tree in (* Input sanitization: Force position to be defined within the tree, in range [0, elm-count(tree)]. *)
 	      if pos > n then n else if pos < 0 then 0 else pos
-    in
-    (* Loop, walking down the tree to find the unique position with pos number of elements to the left. *)
+    in (* Loop, walking down the tree to find the unique position with pos number of elements to the left. *)    
     let rec loop (pos:int) (tree:'a tree) (tsl:('a tree) list) (tsr:('a tree) list) =
       match tree with
       | Nil     -> failwith "invalid argument: focus: nil"  (* Violates: #Bins = #Leaves + 1 *)
       | Leaf(x) -> failwith "invalid argument: focus: leaf" (* Violates: #Bins = #Leaves + 1 *)
-      | Bin(bi,l,r) -> (
+      | Bin(lev,c,l,r) -> (
 	let cl = elm_cnt_of_tree l in
-	if pos = cl then {lev=bi.lev; left=Trees(l::tsl); right=Trees(r::tsr)}
-	else if pos < cl then loop pos      l tsl (Bin({lev=bi.lev; elm_cnt=elm_cnt_of_tree r},Nil,r)::tsr)
-	else                  loop (pos-cl) r     (Bin({lev=bi.lev; elm_cnt=cl               },l,Nil)::tsl) tsr
+	if pos = cl then {lev; left=Trees(l::tsl); right=Trees(r::tsr)}
+	else if pos < cl then loop pos      l tsl (Bin(lev, elm_cnt_of_tree r,Nil,r)::tsr)
+	else                  loop (pos-cl) r     (Bin(lev, cl               ,l,Nil)::tsl) tsr
       )
     in loop pos tree [] []
 end
