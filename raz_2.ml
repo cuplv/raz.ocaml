@@ -206,30 +206,31 @@ module Raz : RAZ = struct
 			  then Bin ({lev=bi1.lev;elm_cnt=elm_cnt}, l1, append r1 t2)
 			  else Bin ({lev=bi2.lev;elm_cnt=elm_cnt}, append t1 l2, r2)
 				  
-  let rec tree_of_trees (d:dir) (tree:'a tree(*[X1;Y1]*)) (trees:('a tree(*[X2;Y2]*))list(*[;]*)) : 'a tree (*[X1*X2;M(X1*X2)*(Y1*Y2)]*) =
+  let rec tree_of_trees (d:dir) (trees:('a tree(*[X2;Y2]*))list(*[;]*)) : 'a tree (*[X1*X2;M(X1*X2)*(Y1*Y2)]*) =
     match trees with
-    | [] -> tree
+    | [] -> Nil
     | tree2::trees -> 
        match d with (* Grown proceeds in direction `d`: either leftward (L) or rightward (R) *)
-       | L -> tree_of_trees d (append tree2 tree) trees
-       | R -> tree_of_trees d (append tree tree2) trees
+       | L -> append (tree_of_trees d trees) tree2
+       | R -> append tree2 (tree_of_trees d trees)
 			    
-  let rec tree_of_elms (d:dir) (tree:'a tree) (elms:'a elms) : 'a tree =
+  let rec tree_of_elms (d:dir) (elms:'a elms) : 'a tree =
     match elms with (* Grown proceeds in direction `d`: either leftward (L) or rightward (R) *)
-    | Trees(trees)       -> tree_of_trees d tree trees
-    | Cons(elm,lev,elms) -> 
-       match d with
-       | L -> (append (tree_of_elms L Nil elms) (append (tree_of_lev lev) (Leaf elm)))
-       | R -> (append (append (Leaf elm) (tree_of_lev lev)) (tree_of_elms R Nil elms))
+    | Trees(trees) -> tree_of_trees d trees
+    | Cons(elm,lev,elms) -> (match d with
+			     | L -> append (tree_of_elms L elms) (append (tree_of_lev lev) (Leaf elm))
+			     | R -> append (append (Leaf elm) (tree_of_lev lev)) (tree_of_elms R elms)
+			    )
 			   
   let unfocus (z: 'a zip) : 'a tree =  
-    let left  = (tree_of_elms L Nil z.left) in
-    let right = (tree_of_elms R Nil z.right) in
+    let left  = (tree_of_elms L z.left) in
+    let right = (tree_of_elms R z.right) in
     let tree = (append left (append (tree_of_lev z.lev) right)) in
     let iswf = wf_unfocused_tree tree in
     if not iswf then 
-       Printf.printf "- - - - - - - - - - - - - - - NOT WELL-FORMED.\n"
-    else ()
+       Printf.printf "- - - - - - - - - - - - - - - is NOT WELL-FORMED. >:(\n"
+    else 
+       Printf.printf "- - - - - - - - - - - - - - - is well-formed. <3 <3 <3\n"
     ;
     tree
 	   
@@ -244,8 +245,8 @@ module Raz : RAZ = struct
       | Bin(bi,l,r) -> (
 	let cl = elm_cnt_of_tree l in
 	if pos = cl then {lev=bi.lev; left=Trees(l::tsl); right=Trees(r::tsr)}
-	else if pos < cl then loop l     (Bin({lev=bi.lev; elm_cnt=elm_cnt_of_tree r},Nil,l)::tsl) tsr
-	else                  loop r tsl (Bin({lev=bi.lev; elm_cnt=cl               },l,Nil)::tsr)
+	else if pos < cl then loop l tsl (Bin({lev=bi.lev; elm_cnt=elm_cnt_of_tree r},Nil,r)::tsr)
+	else                  loop r (Bin({lev=bi.lev; elm_cnt=cl               },l,Nil)::tsl) tsr
       )
     in loop tree [] []
 end
