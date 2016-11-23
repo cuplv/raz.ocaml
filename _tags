@@ -1,1 +1,2 @@
 true : package(unix)
+true : package(ppx_deriving.std)

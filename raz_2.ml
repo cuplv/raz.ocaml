@@ -61,23 +61,41 @@ module type RAZ =
       | Move    of dir
 		     
     val empty  : lev(*[X]*) -> 'a zip (*[X;0]*)
+
     val do_cmd : 'a cmd (*[X1]*) -> 'a zip (*[X2;Y]*) -> 'a zip (*[X1*X2;M(X1)*Y]*)   (* <<< M~X1 is written, but not Y *) 
 				      
     val unfocus : 'a zip (*[X;Y]*) -> 'a tree (*[X;M(X)*Y]*)        (* <<< M(X) is written (where M is namespace); Y is not *written*, it is reused. *)
+
     val focus   : 'a tree (*[X;Y]*) -> int -> 'a zip (*[X;M(X)*Y]*)   (* <<< "" *)
+
+    val pp_zip : 
+      (Format.formatter -> 'a -> Ppx_deriving_runtime.unit) ->
+      Format.formatter -> 'a zip -> Ppx_deriving_runtime.unit
+
+    val pp_tree : 
+      (Format.formatter -> 'a -> Ppx_deriving_runtime.unit) ->
+      Format.formatter -> 'a tree -> Ppx_deriving_runtime.unit
+
   end
 
 module Raz : RAZ = struct
   type lev      = int
+  [@@deriving show]
   type cnt      = int
+  [@@deriving show]
   type dir      = L | R
+  [@@deriving show]
   type bin_info = { lev:lev; elm_cnt:cnt }
+  [@@deriving show]
   type 'a tree  = Bin  of bin_info * 'a tree * 'a tree (* Invariant: Levels of sub-trees are less-or-than-equal-to Bin's level *)
 		| Leaf of 'a (* Invariant: There are N+1 Bin nodes in every tree with N leaves. *)
 		| Nil (* Unfocused invariant: Exactly two Nils, the leftmost/rightmost terminals of the (unfocused) tree. *)
+  [@@deriving show]
   type 'a elms  = Cons of 'a * lev * 'a elms (* Invariant: element always followed by a level *)
 		| Trees of ('a tree) list    (* Invariant: trees not interposed with elements/levels. trim transforms this list. *)
+  [@@deriving show]
   type 'a zip   = { left:'a elms; lev:lev; right:'a elms}
+  [@@deriving show]
 		    
   let empty (l:lev(*[X]*)) : 'a zip(*[X;0]*) = 
     {left=Trees([]);lev=l;right=Trees([])}
@@ -148,12 +166,12 @@ module Raz : RAZ = struct
     | Nil, _ -> t2
     | _, Nil -> t1
     | Leaf(_), Leaf(_)       -> failwith "invalid argument: append: leaf-leaf" (* leaf-leaf case: Violates invariant that elements and levels interleave. *)
-    | Leaf(a), Bin(bi, l, r) -> Bin({lev=bi.lev;elm_cnt=elm_cnt}, append t1 l, r)
-    | Bin(bi, l, r), Leaf(a) -> Bin({lev=bi.lev;elm_cnt=elm_cnt}, l, append r t2)
+    | Leaf(a), Bin(bi, l, r) -> Bin ({lev=bi.lev;elm_cnt=elm_cnt}, append t1 l, r)
+    | Bin(bi, l, r), Leaf(a) -> Bin ({lev=bi.lev;elm_cnt=elm_cnt}, l, append r t2)
     | Bin(bi1, l1, r1),
       Bin(bi2, l2, r2) -> if bi1.lev >= bi2.lev
-			  then Bin({lev=bi1.lev;elm_cnt=elm_cnt}, l1, append r1 t2)
-			  else Bin({lev=bi2.lev;elm_cnt=elm_cnt}, append t1 l2, r2)
+			  then Bin ({lev=bi1.lev;elm_cnt=elm_cnt}, l1, append r1 t2)
+			  else Bin ({lev=bi2.lev;elm_cnt=elm_cnt}, append t1 l2, r2)
 				  
   let rec tree_of_trees (d:dir) (tree:'a tree(*[X1;Y1]*)) (trees:('a tree(*[X2;Y2]*))list(*[;]*)) : 'a tree (*[X1*X2;M(X1*X2)*(Y1*Y2)]*) =
     match trees with
@@ -172,8 +190,8 @@ module Raz : RAZ = struct
        | R -> tree_of_elms d (append (tree_of_lev lev) (append (Leaf elm) tree)) elms
 			   
   let unfocus (z: 'a zip) : 'a tree =
-    append (tree_of_elms L Nil                 z.left ) 
-	   (tree_of_elms R (tree_of_lev z.lev) z.right)
+    append (tree_of_elms L (tree_of_lev z.lev) z.left ) 
+	   (tree_of_elms R Nil                 z.right)
 	   
   let focus (tree:'a tree) (pos:int) : 'a zip =  
     let pos = let n = elm_cnt_of_tree tree in 
