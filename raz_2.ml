@@ -96,7 +96,40 @@ module Raz : RAZ = struct
   [@@deriving show]
   type 'a zip   = { left:'a elms; lev:lev; right:'a elms}
   [@@deriving show]
-		    
+
+  (* wf_zip: Predicate for testing the well-formedness of the zipper: 
+     Holds iff the invariants hold. 
+
+    Invariant: Nils are permitted only at the endpoints of the unfocused tree representation.
+    Further, they *must* be there.  If they are not— if the endpoints consist of a Leaf, with a sequence element— 
+    then the invariant is broken that the sequence starts and ends with levels, 
+    the thing on which we are permitted to place the focus.  Suppose the endpoints are Leafs (sequence elements),
+    then we cannot ever place the focus earlier or later, to insert an element at the start or end, respectively.      
+
+    (dir_op = Some L) means: There *must* be a Nil at the left-most position 
+    (dir_op = Some R) means: There *must* be a Nil at the right-most position
+    (dir_op = None)   means: There *must not* be a Nil anywhere within the tree.
+   *)
+	
+
+  let rec wf_tree_dir_op dir_op t =
+    match dir_op, t with
+    | None    , Nil              -> false (* Broken invariant: *)
+    | Some _  , Leaf _           -> false (* Broken invariant: *)    
+    | Some _  , Nil              -> true
+    | None    , Leaf _           -> true
+    | (Some L), Bin(_, Nil, r  ) -> wf_tree_dir_op None r
+    | (Some R), Bin(_,  l, Nil ) -> wf_tree_dir_op None l
+    | None    , Bin(_,  l,  r  ) -> (wf_tree_dir_op None l)     && (wf_tree_dir_op None     r)
+    | (Some L), Bin(_,  l,  r  ) -> (wf_tree_dir_op (Some L) l) && (wf_tree_dir_op None     r)
+    | (Some R), Bin(_,  l,  r  ) -> (wf_tree_dir_op None l)     && (wf_tree_dir_op (Some R) r)
+
+  let wf_unfocused_tree t =
+    match t with
+    | Nil          -> false (* Broken invariant: #levels = #leaves + 1 *)
+    | Leaf _       -> false (* Broken invariant: #levels = #leaves + 1 *)
+    | Bin(_, l, r) -> (wf_tree_dir_op (Some L) l) && (wf_tree_dir_op (Some R) r)
+
   let empty (l:lev(*[X]*)) : 'a zip(*[X;0]*) = 
     {left=Trees([]);lev=l;right=Trees([])}
       
@@ -177,21 +210,28 @@ module Raz : RAZ = struct
     match trees with
     | [] -> tree
     | tree2::trees -> 
-       match d with
-       | L -> tree_of_trees d (append tree tree2) trees
-       | R -> tree_of_trees d (append tree2 tree) trees
+       match d with (* Grown proceeds in direction `d`: either leftward (L) or rightward (R) *)
+       | L -> tree_of_trees d (append tree2 tree) trees
+       | R -> tree_of_trees d (append tree tree2) trees
 			    
   let rec tree_of_elms (d:dir) (tree:'a tree) (elms:'a elms) : 'a tree =
-    match elms with
+    match elms with (* Grown proceeds in direction `d`: either leftward (L) or rightward (R) *)
     | Trees(trees)       -> tree_of_trees d tree trees
     | Cons(elm,lev,elms) -> 
        match d with
-       | L -> tree_of_elms d (append tree (append (Leaf elm) (tree_of_lev lev))) elms
-       | R -> tree_of_elms d (append (tree_of_lev lev) (append (Leaf elm) tree)) elms
+       | L -> (append (tree_of_elms L Nil elms) (append (tree_of_lev lev) (Leaf elm)))
+       | R -> (append (append (Leaf elm) (tree_of_lev lev)) (tree_of_elms R Nil elms))
 			   
-  let unfocus (z: 'a zip) : 'a tree =
-    append (tree_of_elms L (tree_of_lev z.lev) z.left ) 
-	   (tree_of_elms R Nil                 z.right)
+  let unfocus (z: 'a zip) : 'a tree =  
+    let left  = (tree_of_elms L Nil z.left) in
+    let right = (tree_of_elms R Nil z.right) in
+    let tree = (append left (append (tree_of_lev z.lev) right)) in
+    let iswf = wf_unfocused_tree tree in
+    if not iswf then 
+       Printf.printf "- - - - - - - - - - - - - - - NOT WELL-FORMED.\n"
+    else ()
+    ;
+    tree
 	   
   let focus (tree:'a tree) (pos:int) : 'a zip =  
     let pos = let n = elm_cnt_of_tree tree in 
