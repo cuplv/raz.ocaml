@@ -65,6 +65,7 @@ module type RAZ =
     val elm_cnt : 'a tree -> int
 
     val do_cmd : 'a cmd (*[X1]*) -> 'a zip (*[X2;Y]*) -> 'a zip (*[X1*X2;M(X1)*Y]*)   (* <<< M~X1 is written, but not Y *) 
+    val insert : dir -> 'a -> lev -> 'a zip -> 'a zip
 				      
     val unfocus : 'a zip (*[X;Y]*) -> 'a tree (*[X;M(X)*Y]*)        (* <<< M(X) is written (where M is namespace); Y is not *written*, it is reused. *)
 
@@ -214,13 +215,14 @@ module Raz : RAZ = struct
     | Move    of dir
   type 'a cmds = 'a zip -> 'a zip
 				  
+  let insert : dir -> 'a -> lev -> 'a zip -> 'a zip =
+    fun d a lev z -> match d with
+		     | L -> {z with left  = Cons(a, lev, z.left )}
+		     | R -> {z with right = Cons(a, lev, z.right)}
+
   let do_cmd : 'a cmd -> 'a cmds =
     function
-    | Insert (d,a,lev) -> (
-      match d with
-      | L -> fun z -> {z with left  = Cons(a, lev, z.left )}
-      | R -> fun z -> {z with right = Cons(a, lev, z.right)}
-    )
+    | Insert (d,a,lev) -> insert d a lev
     | ( Remove (d) | Replace(d,_) | Move (d) ) as trim_cmd -> (
       fun z ->
       let trimmed = match d with
@@ -262,19 +264,18 @@ module Raz : RAZ = struct
 		      | L -> tree_of_trees d (append tree2 tree) trees
 		      | R -> tree_of_trees d (append tree tree2) trees
 			    
-  let rec tree_of_elms (d:dir) (elms:'a elms) : 'a tree =
+  let rec tree_of_elms (d:dir) (tree:'a tree) (elms:'a elms) : 'a tree =
     match elms with (* Grown proceeds in direction `d`: either leftward (L) or rightward (R) *)
-    | Trees(trees) -> tree_of_trees d Nil trees
+    | Trees(trees) -> tree_of_trees d tree trees
     | Cons(elm,lev,elms) -> (match d with
-			     | L -> append (tree_of_elms L elms) (append (tree_of_lev lev) (Leaf elm))
-			     | R -> append (append (Leaf elm) (tree_of_lev lev)) (tree_of_elms R elms)
+			     | L -> tree_of_elms L (append      (append (tree_of_lev lev) (Leaf elm)) tree) elms
+			     | R -> tree_of_elms R (append tree (append (Leaf elm) (tree_of_lev lev))     ) elms
 			    )
 			   
   let unfocus (z: 'a zip) : 'a tree =      
-    append 
-      (tree_of_elms L z.left) 
-      (append (tree_of_lev z.lev)
-	      (tree_of_elms R z.right))
+    append (tree_of_elms L Nil z.left) 
+	   (append (tree_of_lev z.lev)
+		   (tree_of_elms R Nil z.right))
 	   
   let focus (tree:'a tree) (pos:int) : 'a zip =  
     (* Input sanitization: Force position to be defined within the tree, in range [0, elm-count(tree)]. *)

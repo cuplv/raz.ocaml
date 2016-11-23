@@ -91,7 +91,7 @@ let rec rnd_insert_r2 current_size n r2 =
   let p  = Random.int (current_size+1) in
   let t  = Raz2.unfocus r2 in
   let r2 = Raz2.focus t p in
-  let r2 = Raz2.do_cmd (Raz2.Insert(Raz2.L,n,lev)) r2 in
+  let r2 = Raz2.insert Raz2.L n lev r2 in
   rnd_insert_r2 (current_size+1) (n-1) r2
 
 let rec db_rnd_insert_r2 current_size n r2 =
