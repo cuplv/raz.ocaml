@@ -98,12 +98,12 @@ let rec db_rnd_insert_r2 current_size n r2 =
   if n <= 0 then r2 else
   let lev = rnd_level() in
   let p = Random.int (current_size+1) in
-  let pr = true in (* Print stuff below? *)
+  let pr = false in (* Print stuff below? *)
   let _  = if pr then Format.printf "r2:\n%a@\n" (Raz2.pp_zip pp_elm) r2 in
   
   let t  = Raz2.unfocus r2 in
   let _  = if Raz2.wf_unfocused_tree t then 
-	     if pr then Format.printf "<3 <3 <3 <3 <3 <3 <3 <3 <3 <3 :)  Well-formed tree!\n" 
+	     (if pr then Format.printf "<3 <3 <3 <3 <3 <3 <3 <3 <3 <3 :)  Well-formed tree!\n" )
 	   else
 	     ( Format.printf "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TREE NOT WELL-FORMED!\n" ;
 	       Format.printf "%a\n" (Raz2.pp_tree pp_elm) t ;

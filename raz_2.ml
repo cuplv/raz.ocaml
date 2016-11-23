@@ -97,7 +97,7 @@ module Raz : RAZ = struct
   type dir      = L | R
   [@@deriving show]
   type 'a tree  = Bin  of lev * elm_cnt * 'a tree * 'a tree (* Invariant: Levels of sub-trees are less-or-than-equal-to Bin's level *)
-		| Leaf of 'a (* Invariant: There are N+1 Bin nodes in every tree with N leaves. *)
+		| Leaf of 'a (* Invariant: There are N+1 Bin nodes in every (unfocused) tree with N leaves. *)
 		| Nil (* Unfocused invariant: Exactly two Nils, the leftmost/rightmost terminals of the (unfocused) tree. *)
   [@@deriving show]
   type 'a elms  = Cons of 'a * lev * 'a elms (* Invariant: element always followed by a level *)
@@ -159,15 +159,15 @@ module Raz : RAZ = struct
 	
   let rec tree_dir_op dir_op t =
     match dir_op, t with
-    | None    , Nil                -> false (* Broken invariant: *)
-    | Some _  , Leaf _             -> false (* Broken invariant: *)
-    | Some _  , Nil                -> true
-    | None    , Leaf _             -> true
-    | (Some L), Bin(_,_, Nil, r  ) -> tree_dir_op None r
-    | (Some R), Bin(_,_,  l, Nil ) -> tree_dir_op None l
-    | None    , Bin(_,_,  l,  r  ) -> (tree_dir_op None l)     && (tree_dir_op None     r)
-    | (Some L), Bin(_,_,  l,  r  ) -> (tree_dir_op (Some L) l) && (tree_dir_op None     r)
-    | (Some R), Bin(_,_,  l,  r  ) -> (tree_dir_op None l)     && (tree_dir_op (Some R) r)
+    | None  , Nil                -> false (* Broken invariant: *)
+    | Some _, Leaf _             -> false (* Broken invariant: *)
+    | Some _, Nil                -> true
+    | None  , Leaf _             -> true
+    | Some L, Bin(_,_, Nil, r  ) -> tree_dir_op None r
+    | Some R, Bin(_,_,  l, Nil ) -> tree_dir_op None l
+    | None  , Bin(_,_,  l,  r  ) -> (tree_dir_op None     l) && (tree_dir_op None     r)
+    | Some L, Bin(_,_,  l,  r  ) -> (tree_dir_op (Some L) l) && (tree_dir_op None     r)
+    | Some R, Bin(_,_,  l,  r  ) -> (tree_dir_op None     l) && (tree_dir_op (Some R) r)
 
   let tree t =
     match t with
