@@ -26,8 +26,10 @@ module Params = struct
   let groups_ = ref 10          (* num of insert groups per sequence *)
   let reps_ = ref 1             (* num of times to repeat the process *)
   let mult_inserts_ = ref false (* whether insertions is multiplied by rep number *)
+  let test_db_ = ref false      (* Controls whether we test for well-formedness; this will affect performance, dramatically. *)
 
   let args = [
+    ("-db",       Arg.Set test_db_,       " well-formedness checks");
     ("--nohead",  Arg.Set no_head_,       " supress csv header");
     ("--seed",    Arg.Set_int rnd_seed_,  " random seed");
     ("--tag",     Arg.Set_string tag_,    " user tag");
@@ -45,6 +47,7 @@ module Params = struct
     (fun arg -> invalid_arg ("Unknown: "^arg))
     "usage: eval [options]"
 
+  let test_db = !test_db_
   let no_head = !no_head_
   let rnd_seed = !rnd_seed_
   let tag = !tag_
@@ -77,7 +80,8 @@ let rec rnd_insert_ft current_size n ft =
 let rec rnd_insert_r current_size n r =
   if n <= 0 then r else
   let p = Random.int (current_size+1) in
-  let r = Raz.focus (Raz.unfocus r) p in
+  let t = Raz.unfocus r in
+  let r = Raz.focus t p in
   let r = Raz.insert Raz.L n r in
   rnd_insert_r (current_size+1) (n-1) r
 
@@ -94,24 +98,26 @@ let rec db_rnd_insert_r2 current_size n r2 =
   if n <= 0 then r2 else
   let lev = rnd_level() in
   let p = Random.int (current_size+1) in
-  let _  = Format.printf "r2:\n%a@\n" (Raz2.pp_zip pp_elm) r2 in
+  let pr = true in (* Print stuff below? *)
+  let _  = if pr then Format.printf "r2:\n%a@\n" (Raz2.pp_zip pp_elm) r2 in
   
   let t  = Raz2.unfocus r2 in
   let _  = if Raz2.wf_unfocused_tree t then 
-	     Format.printf "<3 <3 <3 <3 <3 <3 <3 <3 <3 <3 :)  Well-formed tree!" 
+	     if pr then Format.printf "<3 <3 <3 <3 <3 <3 <3 <3 <3 <3 :)  Well-formed tree!\n" 
 	   else
-	     ( Format.printf "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TREE NOT WELL-FORMED!" ;
-	       assert false )
+	     ( Format.printf "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TREE NOT WELL-FORMED!\n" ;
+	       Format.printf "%a\n" (Raz2.pp_tree pp_elm) t ;
+	     )
   in
-  let _  = Format.printf "unfocus r2:\n%a@\n" (Raz2.pp_tree pp_elm) t in  
+  let _  = if pr then Format.printf "unfocus r2:\n%a@\n" (Raz2.pp_tree pp_elm) t in  
   
   let r2 = Raz2.focus t p in
-  let _  = Format.printf "focus %d (unfocus r2):\n%a@\n" p (Raz2.pp_zip pp_elm) r2 in
+  let _  = if pr then Format.printf "focus %d (unfocus r2):\n%a@\n" p (Raz2.pp_zip pp_elm) r2 in
   
   let r2 = Raz2.do_cmd (Raz2.Insert(Raz2.L,n,lev)) r2 in
-  let _  = Format.printf "************* \n insert data=%d lev=%d (focus (unfocus r2)):\n%a@\n" n lev (Raz2.pp_zip pp_elm) r2 in
+  let _  = if pr then Format.printf "************* \n insert data=%d lev=%d (focus (unfocus r2)):\n%a@\n" n lev (Raz2.pp_zip pp_elm) r2 in
 
-  rnd_insert_r2 (current_size+1) (n-1) r2
+  db_rnd_insert_r2 (current_size+1) (n-1) r2
 
 
 let eval() =
@@ -141,7 +147,10 @@ let eval() =
     r
   else r in
   let r2 = if Params.test_raz2 && Params.start > 0 then
-    let (t,r2) = time (fun()->rnd_insert_r2 0 Params.start r2) in
+    let (t,r2) = time ( fun()->
+			if Params.test_db
+			then db_rnd_insert_r2 0 Params.start r2
+			else    rnd_insert_r2 0 Params.start r2 ) in
     Printf.printf "%d,%d,%s,%s,%d,%d,%d,%.4f\n%!"
       (int_of_float (Unix.time())) Params.rnd_seed Params.tag
       "RAZ-2" 0 0 Params.start t;
@@ -176,7 +185,11 @@ let eval() =
     (* loop to grow one RAZ-2 sequence *)
     let rec seq_r2 size repeats r2 =
         if repeats > 0 then
-        let (ins_time,new_r2) = time (fun()->rnd_insert_r2 size ins r2) in
+        let (ins_time,new_r2) = time ( fun()->
+				       if Params.test_db
+				       then db_rnd_insert_r2 size ins r2
+				       else    rnd_insert_r2 size ins r2 )
+	in
         Printf.printf "%d,%d,%s,%s,%d,%d,%d,%.4f\n%!"
           (int_of_float (Unix.time())) Params.rnd_seed Params.tag
           "RAZ-2" i size ins ins_time;

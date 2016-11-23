@@ -62,6 +62,8 @@ module type RAZ =
 		     
     val empty  : lev(*[X]*) -> 'a zip (*[X;0]*)
 
+    val elm_cnt : 'a tree -> int
+
     val do_cmd : 'a cmd (*[X1]*) -> 'a zip (*[X2;Y]*) -> 'a zip (*[X1*X2;M(X1)*Y]*)   (* <<< M~X1 is written, but not Y *) 
 				      
     val unfocus : 'a zip (*[X;Y]*) -> 'a tree (*[X;M(X)*Y]*)        (* <<< M(X) is written (where M is namespace); Y is not *written*, it is reused. *)
@@ -186,7 +188,9 @@ module Raz : RAZ = struct
     | Bin(bi,_,_) -> bi.elm_cnt
     | Leaf(_)     -> 1
     | Nil         -> 0
-		       
+	
+  let elm_cnt t = elm_cnt_of_tree t
+	       
   let trim (d:dir) (t:'a elms(*[X1*X2;Y]*)) : ('a * lev(*[X1]*) * 'a elms(*[X2;Y]*)) option =
     match t with
     | Cons(a, lev, elms) -> Some((a, lev, elms))
@@ -253,7 +257,7 @@ module Raz : RAZ = struct
 				  
   let rec tree_of_trees (d:dir) (tree:'a tree) (trees:('a tree(*[X2;Y2]*))list(*[;]*)) : 'a tree (*[X1*X2;M(X1*X2)*(Y1*Y2)]*) =
     match trees with
-    | [] -> Nil
+    | [] -> tree
     | tree2::trees -> match d with (* Grown proceeds in direction `d`: either leftward (L) or rightward (R) *)
 		      | L -> tree_of_trees d (append tree2 tree) trees
 		      | R -> tree_of_trees d (append tree tree2) trees
