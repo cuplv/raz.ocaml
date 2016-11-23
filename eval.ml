@@ -84,10 +84,25 @@ let rec rnd_insert_r current_size n r =
 let rec rnd_insert_r2 current_size n r2 =
   if n <= 0 then r2 else
   let lev = rnd_level() in
+  let p  = Random.int (current_size+1) in
+  let t  = Raz2.unfocus r2 in
+  let r2 = Raz2.focus t p in
+  let r2 = Raz2.do_cmd (Raz2.Insert(Raz2.L,n,lev)) r2 in
+  rnd_insert_r2 (current_size+1) (n-1) r2
+
+let rec db_rnd_insert_r2 current_size n r2 =
+  if n <= 0 then r2 else
+  let lev = rnd_level() in
   let p = Random.int (current_size+1) in
   let _  = Format.printf "r2:\n%a@\n" (Raz2.pp_zip pp_elm) r2 in
   
   let t  = Raz2.unfocus r2 in
+  let _  = if Raz2.wf_unfocused_tree t then 
+	     Format.printf "<3 <3 <3 <3 <3 <3 <3 <3 <3 <3 :)  Well-formed tree!" 
+	   else
+	     ( Format.printf "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TREE NOT WELL-FORMED!" ;
+	       assert false )
+  in
   let _  = Format.printf "unfocus r2:\n%a@\n" (Raz2.pp_tree pp_elm) t in  
   
   let r2 = Raz2.focus t p in

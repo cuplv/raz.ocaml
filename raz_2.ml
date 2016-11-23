@@ -68,10 +68,16 @@ module type RAZ =
 
     val focus   : 'a tree (*[X;Y]*) -> int -> 'a zip (*[X;M(X)*Y]*)   (* <<< "" *)
 
+
+    (* For debugging and regression testing: Tests that the unfocused tree is well-formed. *)
+    val wf_unfocused_tree : 'a tree -> bool
+
+    (* For debugging and regression testing. *)
     val pp_zip : 
       (Format.formatter -> 'a -> Ppx_deriving_runtime.unit) ->
       Format.formatter -> 'a zip -> Ppx_deriving_runtime.unit
 
+    (* For debugging and regression testing. *)
     val pp_tree : 
       (Format.formatter -> 'a -> Ppx_deriving_runtime.unit) ->
       Format.formatter -> 'a tree -> Ppx_deriving_runtime.unit
@@ -222,17 +228,11 @@ module Raz : RAZ = struct
 			     | R -> append (append (Leaf elm) (tree_of_lev lev)) (tree_of_elms R elms)
 			    )
 			   
-  let unfocus (z: 'a zip) : 'a tree =  
-    let left  = (tree_of_elms L z.left) in
-    let right = (tree_of_elms R z.right) in
-    let tree = (append left (append (tree_of_lev z.lev) right)) in
-    let iswf = wf_unfocused_tree tree in
-    if not iswf then 
-       Printf.printf "- - - - - - - - - - - - - - - is NOT WELL-FORMED. >:(\n"
-    else 
-       Printf.printf "- - - - - - - - - - - - - - - is well-formed. <3 <3 <3\n"
-    ;
-    tree
+  let unfocus (z: 'a zip) : 'a tree =      
+    append 
+      (tree_of_elms L z.left) 
+      (append (tree_of_lev z.lev)
+	      (tree_of_elms R z.right))
 	   
   let focus (tree:'a tree) (pos:int) : 'a zip =  
     (* Input sanitization: Force position to be defined within the tree, in range [0, elm-count(tree)]. *)
