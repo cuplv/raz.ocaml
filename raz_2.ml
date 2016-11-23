@@ -235,20 +235,22 @@ module Raz : RAZ = struct
     tree
 	   
   let focus (tree:'a tree) (pos:int) : 'a zip =  
+    (* Input sanitization: Force position to be defined within the tree, in range [0, elm-count(tree)]. *)
     let pos = let n = elm_cnt_of_tree tree in 
 	      if pos > n then n else if pos < 0 then 0 else pos
     in
-    let rec loop (tree:'a tree) (tsl:('a tree) list) (tsr:('a tree) list) =
+    (* Loop, walking down the tree to find the unique position with pos number of elements to the left. *)
+    let rec loop (pos:int) (tree:'a tree) (tsl:('a tree) list) (tsr:('a tree) list) =
       match tree with
-      | Nil     -> failwith "invalid argument: focus: nil" (* Violates: #Bins = #Leaves + 1 *)
+      | Nil     -> failwith "invalid argument: focus: nil"  (* Violates: #Bins = #Leaves + 1 *)
       | Leaf(x) -> failwith "invalid argument: focus: leaf" (* Violates: #Bins = #Leaves + 1 *)
       | Bin(bi,l,r) -> (
 	let cl = elm_cnt_of_tree l in
 	if pos = cl then {lev=bi.lev; left=Trees(l::tsl); right=Trees(r::tsr)}
-	else if pos < cl then loop l tsl (Bin({lev=bi.lev; elm_cnt=elm_cnt_of_tree r},Nil,r)::tsr)
-	else                  loop r (Bin({lev=bi.lev; elm_cnt=cl               },l,Nil)::tsl) tsr
+	else if pos < cl then loop pos      l tsl (Bin({lev=bi.lev; elm_cnt=elm_cnt_of_tree r},Nil,r)::tsr)
+	else                  loop (pos-cl) r     (Bin({lev=bi.lev; elm_cnt=cl               },l,Nil)::tsl) tsr
       )
-    in loop tree [] []
+    in loop pos tree [] []
 end
 		     
 (* 
