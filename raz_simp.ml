@@ -30,7 +30,13 @@ let rnd_level : unit -> lev =
   else if false then (
     let n = Bits.ffs0 (Random.bits()) in
     let m = Bits.ffs0 (Random.bits()) in
-    if n > m then m else n (* Take the MAX *)
+    if n > m then n else m (* Take the MAX *)
+  )
+  else if false then (
+    let max n m = if n > m then n else m in
+    let rbits1 = Random.bits() in
+    let rbits2 = Random.bits() in
+    max (Bits.ffs0 rbits1) (Bits.ffs0 rbits2)
   )
   else (* Best choice: *)
     Bits.ffs0 (Random.bits())
