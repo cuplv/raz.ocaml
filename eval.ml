@@ -7,6 +7,9 @@ Fingertree impl is in 'fingertree.ml'
 'bat*.ml' files support the fingertree code.
 Fingertree and supporting files are from 'https://github.com/ocaml-batteries-team/batteries-included'
 *)
+
+Gc.set { (Gc.get()) with Gc.minor_heap_size = 100*1024*1024 }
+
 module F = Fingertree
 module Raz = Raz_simp
 module Raz2 = Raz_2.Raz
