@@ -12,7 +12,6 @@ module Raz = Raz_simp
 module Raz2 = Raz_2.Raz
 
 type elm = int
-[@@deriving show]
 
 module Params = struct
   let no_head_ = ref false      (* whether to suppress csv header *)
@@ -94,30 +93,6 @@ let rec rnd_insert_r2 current_size n r2 =
   let r2 = Raz2.insert Raz2.L n lev r2 in
   rnd_insert_r2 (current_size+1) (n-1) r2
 
-let rec db_rnd_insert_r2 current_size n r2 =
-  if n <= 0 then r2 else
-  let lev = rnd_level() in
-  let p = Random.int (current_size+1) in
-  let pr = true in (* Print stuff below? *)
-  let _  = if pr then Format.printf "r2:\n%a@\n" (Raz2.pp_zip pp_elm) r2 in
-  
-  let t  = Raz2.unfocus r2 in
-  let _  = if Raz2.wf_unfocused_tree t then 
-	     if pr then Format.printf "<3 <3 <3 <3 <3 <3 <3 <3 <3 <3 :)  Well-formed tree!\n" 
-	   else
-	     ( Format.printf "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TREE NOT WELL-FORMED!\n" ;
-	       Format.printf "%a\n" (Raz2.pp_tree pp_elm) t ;
-	     )
-  in
-  let _  = if pr then Format.printf "unfocus r2:\n%a@\n" (Raz2.pp_tree pp_elm) t in  
-  
-  let r2 = Raz2.focus t p in
-  let _  = if pr then Format.printf "focus %d (unfocus r2):\n%a@\n" p (Raz2.pp_zip pp_elm) r2 in
-  
-  let r2 = Raz2.do_cmd (Raz2.Insert(Raz2.L,n,lev)) r2 in
-  let _  = if pr then Format.printf "************* \n insert data=%d lev=%d (focus (unfocus r2)):\n%a@\n" n lev (Raz2.pp_zip pp_elm) r2 in
-
-  db_rnd_insert_r2 (current_size+1) (n-1) r2
 
 
 let eval() =
@@ -148,9 +123,7 @@ let eval() =
   else r in
   let r2 = if Params.test_raz2 && Params.start > 0 then
     let (t,r2) = time ( fun()->
-			if Params.test_db
-			then db_rnd_insert_r2 0 Params.start r2
-			else    rnd_insert_r2 0 Params.start r2 ) in
+    rnd_insert_r2 0 Params.start r2 ) in
     Printf.printf "%d,%d,%s,%s,%d,%d,%d,%.4f\n%!"
       (int_of_float (Unix.time())) Params.rnd_seed Params.tag
       "RAZ-2" 0 0 Params.start t;
@@ -186,9 +159,7 @@ let eval() =
     let rec seq_r2 size repeats r2 =
         if repeats > 0 then
         let (ins_time,new_r2) = time ( fun()->
-				       if Params.test_db
-				       then db_rnd_insert_r2 size ins r2
-				       else    rnd_insert_r2 size ins r2 )
+				          rnd_insert_r2 size ins r2 )
 	in
         Printf.printf "%d,%d,%s,%s,%d,%d,%d,%.4f\n%!"
           (int_of_float (Unix.time())) Params.rnd_seed Params.tag
