@@ -18,14 +18,28 @@ type 'a raz = ('a tlist * 'a * 'a tlist)
 (* neg binomial dist *)
 let rnd_level : unit -> lev =
   fun () ->
-  let rec ffs x =
-    if x = 0 then 0 else
-    let rec loop t r =
-      if (x land t) = 0 then r
-      else loop (t lsl 1) (r + 1)
-    in loop 1 0
-  in
-  ffs (Random.bits())
+  if false then (
+    let rec ffs x =
+      if x = 0 then 0 else
+  let rec loop t r =
+    if (x land t) = 0 then r
+    else loop (t lsl 1) (r + 1)
+  in loop 1 0
+    in ffs (Random.bits())
+  )
+  else if false then (
+    let n = Bits.ffs0 (Random.bits()) in
+    let m = Bits.ffs0 (Random.bits()) in
+    if n > m then n else m (* Take the MAX *)
+  )
+  else if false then (
+    let max n m = if n > m then n else m in
+    let rbits1 = Random.bits() in
+    let rbits2 = Random.bits() in
+    max (Bits.ffs0 rbits1) (Bits.ffs0 rbits2)
+  )
+  else (* Best choice: *)
+    Bits.ffs0 (Random.bits())
 
 (* minimum raz with initial element *)
 let singleton e = (Nil,e,Nil)
