@@ -66,6 +66,7 @@ module type RAZ =
 
     val do_cmd : 'a cmd (*[X1]*) -> 'a zip (*[X2;Y]*) -> 'a zip (*[X1*X2;M(X1)*Y]*)   (* <<< M~X1 is written, but not Y *) 
     val insert : dir -> 'a -> lev -> 'a zip -> 'a zip
+    val peek   : dir -> 'a zip -> 'a option
 				      
     val unfocus : 'a zip (*[X;Y]*) -> 'a tree (*[X;M(X)*Y]*)        (* <<< M(X) is written (where M is namespace); Y is not *written*, it is reused. *)
 
@@ -199,6 +200,16 @@ module Raz : RAZ = struct
     | Replace of dir * 'a
     | Move    of dir
   type 'a cmds = 'a zip -> 'a zip
+
+  let peek : dir -> 'a zip -> 'a option =
+    fun d z -> 
+    let trimmed = match d with
+      | L -> trim L z.left
+      | R -> trim L z.right
+    in
+    match trimmed with
+      | None                   -> None
+      | Some((elm, lev, rest)) -> Some(elm)
 				  
   let insert : dir -> 'a -> lev -> 'a zip -> 'a zip =
     fun d a lev z -> match d with

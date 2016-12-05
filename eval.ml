@@ -102,8 +102,8 @@ let eval() =
   (* init seqs *)
   let r = Raz.singleton 0 |> Raz.insert Raz.L 0 in
   let r2 = Raz2.empty (rnd_level())
-    |> Raz2.do_cmd (Insert(Raz2.L,0,rnd_level()))
-    |> Raz2.do_cmd (Insert(Raz2.L,0,rnd_level()))
+    |> Raz2.do_cmd (Raz2.Insert(Raz2.L,0,rnd_level()))
+    |> Raz2.do_cmd (Raz2.Insert(Raz2.L,0,rnd_level()))
   in
   let ft = F.snoc (F.singleton 0) 0 in
 
