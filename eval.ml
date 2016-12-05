@@ -1,7 +1,7 @@
 (* 
 This file is mostly tests of performance.
 
-RAZ code is all in  'raz_simp.ml'
+RAZ code is all in  'raz_simp.ml', and 'raz_2.ml'
 
 Fingertree impl is in 'fingertree.ml'
 'bat*.ml' files support the fingertree code.
