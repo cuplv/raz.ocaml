@@ -41,6 +41,7 @@ module Params = struct
 end
 
 type elm = int
+[@@deriving show]
 
 let rnd_level = Raz.rnd_level
 
@@ -73,19 +74,24 @@ let to_list_r r =
   in
   drain r [(Raz.view_c r)] (size - 1)
 
+
 let to_list_r2 r2 =
+  (* let _ = Format.printf "pre-unfocus: r2=%a\n%!" (Raz2.pp_zip pp_elm) r2 in *)
   let t = Raz2.unfocus r2 in
+  (* let _ = Format.printf "pre-focus: t=%a\n%!" (Raz2.pp_tree pp_elm) t in *)
   let size = Raz2.elm_cnt t in
   let r2 = Raz2.focus t size in
   let rec drain r2 l =
+    let _ = Format.printf "pre-peek: r2=%a\n%!" (Raz2.pp_zip pp_myelm) r2 in
     match Raz2.peek Raz2.L r2 with
     | None -> l
     | Some(e) ->
     let l = e::l in
+    let _ = Format.printf "pre-remove: r2=%a\n%!" (Raz2.pp_zip pp_myelm) r2 in
     let r2 = Raz2.do_cmd (Raz2.Remove(Raz2.L)) r2 in
     drain r2 l
   in
-  drain r2 []  
+  drain r2 []
 
 let rec insert_seq inserts seq =
   match inserts with
