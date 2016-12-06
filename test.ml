@@ -14,12 +14,13 @@ module Raz2 = Raz_2.Raz
 
 (* inefficient but correct sequence implementation to use as baseline *)
 module Seq = struct
-  type seq = list
-  let insert val index seq =
+  type seq = int list
+  let singleton value = [value]
+  let insert value index seq =
     let with_index = List.mapi (fun i a -> (i,a)) seq in
     let (left,right) = List.partition (fun (i,_) -> i < index) with_index in
-    let with_val = left @ ((0,val)::right) in
-    let without_index = List.map (fun (_,a) -> a)) with_val in
+    let with_val = left @ ((0,value)::right) in
+    let without_index = List.map (fun (_,a) -> a) with_val in
     without_index
   let to_list seq = seq
 
@@ -46,16 +47,17 @@ let rnd_level = Raz.rnd_level
 let to_list_seq = Seq.to_list
 
 let to_list_ft ft =
-  let size = f.size ft in
-  let rec drain ft l size =
-    match size with
-    | 0 -> l
-    | _ ->
-    let l = (F.last ft)::l in
-    let r = F.init ft in
-    drain r l (size - 1)
+  let rec drain ft l =
+    match F.last ft with
+    | None -> l
+    | Some(e) ->
+    let l = e::l in
+    match F.init ft with
+    | None -> l
+    | Some(ft) ->
+    drain ft l
   in
-  drain ft size []
+  drain ft []
 
 let to_list_r r =
   let t = Raz.unfocus r in
@@ -69,23 +71,18 @@ let to_list_r r =
     let r = Raz.remove Raz.L r in
     drain r l (size - 1)
   in
-  drain r size []
+  drain r [(Raz.view_c r)] (size - 1)
 
 let to_list_r2 r2 =
-  let t = Raz2.unfocus r2 in
-  let size = Raz2.elm_cnt t in
-  let r2 = Raz2.focus t size in
-  let rec drain r l size =
-    match size with
-    | 0 -> l
-    | _ ->
-    (* TODO: RAZ2 getlast *)
-    let l = (Raz.view Raz.L r)::l in
-    let r = Raz.remove Raz.L r in
-    drain r l (size - 1)
+  let rec drain r2 l =
+    match Raz2.peek Raz2.L r2 with
+    | None -> l
+    | Some(e) ->
+    let l = e::l in
+    let r2 = Raz2.do_cmd (Raz2.Remove(Raz2.L)) r2 in
+    drain r2 l
   in
-  drain r size []
-  
+  drain r2 []  
 
 let rec rnd_insert_seq current_size n seq =
   if n <= 0 then seq else
@@ -112,6 +109,7 @@ let rec rnd_insert_r2 current_size n r2 =
   if n <= 0 then r2 else
   let lev = rnd_level() in
   let p  = Random.int (current_size+1) in
+  Printf.printf "%d:" p;
   let t  = Raz2.unfocus r2 in
   let r2 = Raz2.focus t p in
   let r2 = Raz2.insert Raz2.L n lev r2 in
@@ -119,18 +117,42 @@ let rec rnd_insert_r2 current_size n r2 =
 
 let test() =
   (* init seqs *)
-  let r = Raz.singleton 0 |> Raz.insert Raz.L 0 in
+  let r = Raz.singleton 0 in
   let r2 = Raz2.empty (rnd_level())
-    |> Raz2.do_cmd (Insert(Raz2.L,0,rnd_level()))
-    |> Raz2.do_cmd (Insert(Raz2.L,0,rnd_level()))
+    |> Raz2.do_cmd (Raz2.Insert(Raz2.L,0,rnd_level()))
   in
-  let ft = F.snoc (F.singleton 0) 0 in
+  let ft = F.singleton 0 in
+  let seq = Seq.singleton 0 in
 
   (* Printf.printf "after init\n"; *)
 
-  (* init random generator *)
-  Random.init Params.rnd_seed;
-
   (* run tests *)
+  Random.init Params.rnd_seed;
+  let seq = rnd_insert_seq 0 10 seq in
+  Random.init Params.rnd_seed;
+  let ft = rnd_insert_ft 0 10 ft in
+  Random.init Params.rnd_seed;
+  let r = rnd_insert_r 0 10 r in
+  Random.init Params.rnd_seed;
+  let r2 = rnd_insert_r2 0 10 r2 in
+
+  (* Print results *)
+  Printf.printf "\n";
+  
+  Printf.printf "Sequence(baseline): \n";
+  List.iter (Printf.printf "%d; ") (to_list_seq seq);
+  Printf.printf "\n";
+
+  Printf.printf "Fingertree: \n";
+  List.iter (Printf.printf "%d; ") (to_list_ft ft);
+  Printf.printf "\n";
+
+  Printf.printf "Raz_simp: \n";
+  List.iter (Printf.printf "%d; ") (to_list_r r);
+  Printf.printf "\n";
+
+  Printf.printf "Raz2: \n";
+  List.iter (Printf.printf "%d; ") (to_list_r2 r2);
+  Printf.printf "\n"
 
 let _ = test()
