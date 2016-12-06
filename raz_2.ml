@@ -190,8 +190,8 @@ module Raz : RAZ = struct
 	 | Leaf(_)::_,               Some _ -> failwith "illegal argument: trim: leaf-leaf" (* leaf-leaf case: Violates Invariant that elements and levels interleave. *)
 	 | Bin(lev,_, Nil, Nil)::trees, Some x -> Some(x, lev, Trees(trees))
 	 | Bin(lev,_, l, r)::trees, _          ->
-	    match d with L -> loop (l::(tree_of_lev lev :: r :: trees)) st 
-		       | R -> loop (r::(tree_of_lev lev :: l :: trees)) st
+	    match d with L -> loop ( l:: Bin(lev, elm_cnt r, Nil, r) :: trees ) st
+		       | R -> loop ( r:: Bin(lev, elm_cnt l, l, Nil) :: trees ) st
        in loop trees None
 	       
   type 'a cmd =
