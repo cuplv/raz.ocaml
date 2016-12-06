@@ -152,7 +152,7 @@ let test() =
 
   (* gen common test data *)
   Random.init Params.rnd_seed;
-  let inserts = gen_insertions 0 10 in
+  let inserts = gen_insertions 0 1000 in
 
   (* run tests *)
   let seq = insert_seq inserts seq in
@@ -163,19 +163,28 @@ let test() =
   (* Print results *)
   (* TODO: compare results *)
   Printf.printf "Sequence(baseline): \n";
-  List.iter (Printf.printf "%d; ") (to_list_seq seq);
+  let seql = (to_list_seq seq) in
+  if false then List.iter (Printf.printf "%d; ") seql;
   Printf.printf "\n";
 
   Printf.printf "Fingertree: \n";
-  List.iter (Printf.printf "%d; ") (to_list_ft ft);
+  let ftl = (to_list_ft ft) in
+  if false then List.iter (Printf.printf "%d; ") ftl;
   Printf.printf "\n";
 
   Printf.printf "Raz_simp: \n";
-  List.iter (Printf.printf "%d; ") (to_list_r r);
+  let rl = (to_list_r r) in
+  if false then List.iter (Printf.printf "%d; ") rl;
   Printf.printf "\n";
 
   Printf.printf "Raz2: \n";
-  List.iter (Printf.printf "%d; ") (to_list_r2 r2);
-  Printf.printf "\n"
-
+  let r2l = (to_list_r2 r2) in
+  if false then List.iter (Printf.printf "%d; ") r2l;
+  Printf.printf "\n" ;
+  assert (seql = ftl) ;
+  assert (seql = rl) ;
+  assert (seql = r2l) ;
+  Printf.printf "success!\n%!" ;
+  ()
+  
 let _ = test()
