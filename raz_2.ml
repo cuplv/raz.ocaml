@@ -76,20 +76,34 @@ module type RAZ =
     (* For debugging and regression testing: Tests that the unfocused tree is well-formed. *)
     val wf_unfocused_tree : 'a tree -> bool
 
+    val pp_zip : 
+      (Format.formatter -> 'a -> Ppx_deriving_runtime.unit) ->
+      Format.formatter -> 'a zip -> Ppx_deriving_runtime.unit
+				      
+    val pp_tree : 
+      (Format.formatter -> 'a -> Ppx_deriving_runtime.unit) ->
+      Format.formatter -> 'a tree -> Ppx_deriving_runtime.unit
 
   end
 
 module Raz : RAZ = struct
   type lev      = int
+  [@@deriving show]
   type elm_cnt  = int
+  [@@deriving show]
   type cnt      = int
+  [@@deriving show]
   type dir      = L | R
+  [@@deriving show]
   type 'a tree  = Bin  of lev * elm_cnt * 'a tree * 'a tree (* Invariant: Levels of sub-trees are less-or-than-equal-to Bin's level *)
 		| Leaf of 'a (* Invariant: There are N+1 Bin nodes in every tree with N leaves. *)
 		| Nil (* Unfocused invariant: Exactly two Nils, the leftmost/rightmost terminals of the (unfocused) tree. *)
+  [@@deriving show]
   type 'a elms  = Cons of 'a * lev * 'a elms (* Invariant: element always followed by a level *)
 		| Trees of ('a tree) list    (* Invariant: trees not interposed with elements/levels. trim transforms this list. *)
+  [@@deriving show]
   type 'a zip   = { left:'a elms; lev:lev; right:'a elms}
+  [@@deriving show]
 
   module Wf = struct
     (* The Wf module consists of predicates for testing the
@@ -190,8 +204,8 @@ module Raz : RAZ = struct
 	 | Leaf(_)::_,               Some _ -> failwith "illegal argument: trim: leaf-leaf" (* leaf-leaf case: Violates Invariant that elements and levels interleave. *)
 	 | Bin(lev,_, Nil, Nil)::trees, Some x -> Some(x, lev, Trees(trees))
 	 | Bin(lev,_, l, r)::trees, _          ->
-	    match d with L -> loop ( l:: Bin(lev, elm_cnt r, Nil, r) :: trees ) st
-		       | R -> loop ( r:: Bin(lev, elm_cnt l, l, Nil) :: trees ) st
+	    match d with L -> loop ( l:: tree_of_lev lev :: r :: trees ) st
+		       | R -> loop ( r:: tree_of_lev lev :: l :: trees ) st
        in loop trees None
 	       
   type 'a cmd =
