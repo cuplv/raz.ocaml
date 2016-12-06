@@ -74,6 +74,9 @@ let to_list_r r =
   drain r [(Raz.view_c r)] (size - 1)
 
 let to_list_r2 r2 =
+  let t = Raz2.unfocus r2 in
+  let size = Raz2.elm_cnt t in
+  let r2 = Raz2.focus t size in
   let rec drain r2 l =
     match Raz2.peek Raz2.L r2 with
     | None -> l
@@ -84,36 +87,39 @@ let to_list_r2 r2 =
   in
   drain r2 []  
 
-let rec rnd_insert_seq current_size n seq =
-  if n <= 0 then seq else
-  let p = Random.int (current_size + 1) in
-  let seq = Seq.insert n p seq in
-  rnd_insert_seq (current_size + 1) (n - 1) seq
+let rec insert_seq inserts seq =
+  match inserts with
+  | [] -> seq
+  | (p,v)::other_inserts ->
+  let seq = Seq.insert v p seq in
+  insert_seq other_inserts seq
 
-let rec rnd_insert_ft current_size n ft =
-  if n <= 0 then ft else
-  let p = Random.int (current_size+1) in
-    let left, right = F.split_at ft p in
-    let ft = F.append (F.snoc left n) right in
-  rnd_insert_ft (current_size+1) (n-1) ft
+let rec insert_ft inserts ft =
+  match inserts with
+  | [] -> ft
+  | (p,v)::other_inserts ->
+  let left, right = F.split_at ft p in
+  let ft = F.append (F.snoc left v) right in
+  insert_ft other_inserts ft
 
-let rec rnd_insert_r current_size n r =
-  if n <= 0 then r else
-  let p = Random.int (current_size+1) in
+let rec insert_r inserts r =
+  match inserts with
+  | [] -> r
+  | (p,v)::other_inserts ->
   let t = Raz.unfocus r in
   let r = Raz.focus t p in
-  let r = Raz.insert Raz.L n r in
-  rnd_insert_r (current_size+1) (n-1) r
+  let r = Raz.insert Raz.L v r in
+  insert_r other_inserts r
 
-let rec rnd_insert_r2 current_size n r2 =
-  if n <= 0 then r2 else
+let rec insert_r2 inserts r2 =
+  match inserts with
+  | [] -> r2
+  | (p,v)::other_inserts ->
   let lev = rnd_level() in
-  let p  = Random.int (current_size+1) in
-  Printf.printf "%d:" p;
   let t  = Raz2.unfocus r2 in
   let r2 = Raz2.focus t p in
-  let r2 = Raz2.insert Raz2.L n lev r2 in
-  rnd_insert_r2 (current_size+1) (n-1) r2
+  let r2 = Raz2.insert Raz2.L v lev r2 in
+  insert_r2 other_inserts r2
 
 let test() =
   (* init seqs *)
@@ -126,19 +132,30 @@ let test() =
 
   (* Printf.printf "after init\n"; *)
 
+  (* makes a list of (position, value) pairs for inserting integers *)
+  let gen_insertions initial_size total_insertions =
+    let rec gen current_size total l =
+      if total <= 0 then l else
+      let rand = (Random.int current_size,current_size) in
+      gen (current_size + 1) (total - 1) (rand::l)
+
+    in
+    List.rev (gen (initial_size + 1) total_insertions [])
+  in
+
+
+  (* gen common test data *)
+  Random.init Params.rnd_seed;
+  let inserts = gen_insertions 0 10 in
+
   (* run tests *)
-  Random.init Params.rnd_seed;
-  let seq = rnd_insert_seq 0 10 seq in
-  Random.init Params.rnd_seed;
-  let ft = rnd_insert_ft 0 10 ft in
-  Random.init Params.rnd_seed;
-  let r = rnd_insert_r 0 10 r in
-  Random.init Params.rnd_seed;
-  let r2 = rnd_insert_r2 0 10 r2 in
+  let seq = insert_seq inserts seq in
+  let ft = insert_ft inserts ft in
+  let r = insert_r inserts r in
+  let r2 = insert_r2 inserts r2 in
 
   (* Print results *)
-  Printf.printf "\n";
-  
+  (* TODO: compare results *)
   Printf.printf "Sequence(baseline): \n";
   List.iter (Printf.printf "%d; ") (to_list_seq seq);
   Printf.printf "\n";
