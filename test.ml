@@ -82,12 +82,12 @@ let to_list_r2 r2 =
   let size = Raz2.elm_cnt t in
   let r2 = Raz2.focus t size in
   let rec drain r2 l =
-    let _ = Format.printf "pre-peek: r2=%a\n%!" (Raz2.pp_zip pp_myelm) r2 in
+    (* let _ = Format.printf "pre-peek: r2=%a\n%!" (Raz2.pp_zip pp_elm) r2 in *)
     match Raz2.peek Raz2.L r2 with
     | None -> l
     | Some(e) ->
     let l = e::l in
-    let _ = Format.printf "pre-remove: r2=%a\n%!" (Raz2.pp_zip pp_myelm) r2 in
+    (* let _ = Format.printf "pre-remove: r2=%a\n%!" (Raz2.pp_zip pp_elm) r2 in *)
     let r2 = Raz2.do_cmd (Raz2.Remove(Raz2.L)) r2 in
     drain r2 l
   in
