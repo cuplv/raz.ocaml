@@ -192,6 +192,8 @@ module Raz : RAZ = struct
 	
   let elm_cnt t = elm_cnt_of_tree t
 	       
+  (* `Trim L ts` means that the "first" element of tree list `ts` is in the leftmost position. *)
+  (* `Trim R ts` means that the "first" element of tree list `ts` is in the rightmost position. *)
   let trim (d:dir) (t:'a elms) : ('a * lev * 'a elms) option =
     match t with
     | Cons(a, lev, elms) -> Some((a, lev, elms))
@@ -218,7 +220,7 @@ module Raz : RAZ = struct
   let peek : dir -> 'a zip -> 'a option =
     fun d z -> 
     let trimmed = match d with
-      | L -> trim L z.left
+      | L -> trim R z.left
       | R -> trim L z.right
     in
     match trimmed with
@@ -236,7 +238,7 @@ module Raz : RAZ = struct
     | ( Remove (d) | Replace(d,_) | Move (d) ) as trim_cmd -> (
       fun z ->
       let trimmed = match d with
-	| L -> trim L z.left
+	| L -> trim R z.left
 	| R -> trim L z.right
       in
       match trimmed with
