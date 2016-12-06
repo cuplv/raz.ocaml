@@ -54,24 +54,19 @@ module type RAZ =
     type 'a zip
     type lev    = int
     type dir    = L | R
-    type 'a cmd (*[X]*) =
-      | Insert  of dir * 'a * lev (*[X]*)
+    type 'a cmd =
+      | Insert  of dir * 'a * lev
       | Remove  of dir
       | Replace of dir * 'a
       | Move    of dir
 		     
-    val empty  : lev(*[X]*) -> 'a zip (*[X;0]*)
-
+    val empty   : lev -> 'a zip
     val elm_cnt : 'a tree -> int
-
-    val do_cmd : 'a cmd (*[X1]*) -> 'a zip (*[X2;Y]*) -> 'a zip (*[X1*X2;M(X1)*Y]*)   (* <<< M~X1 is written, but not Y *) 
-    val insert : dir -> 'a -> lev -> 'a zip -> 'a zip
-    val peek   : dir -> 'a zip -> 'a option
-				      
-    val unfocus : 'a zip (*[X;Y]*) -> 'a tree (*[X;M(X)*Y]*)        (* <<< M(X) is written (where M is namespace); Y is not *written*, it is reused. *)
-
-    val focus   : 'a tree (*[X;Y]*) -> int -> 'a zip (*[X;M(X)*Y]*)   (* <<< "" *)
-
+    val do_cmd  : 'a cmd -> 'a zip -> 'a zip
+    val insert  : dir -> 'a -> lev -> 'a zip -> 'a zip
+    val peek    : dir -> 'a zip -> 'a option
+    val unfocus : 'a zip -> 'a tree
+    val focus   : 'a tree -> int -> 'a zip
 
     (* For debugging and regression testing: Tests that the unfocused tree is well-formed. *)
     val wf_unfocused_tree : 'a tree -> bool
@@ -83,7 +78,6 @@ module type RAZ =
     val pp_tree : 
       (Format.formatter -> 'a -> Ppx_deriving_runtime.unit) ->
       Format.formatter -> 'a tree -> Ppx_deriving_runtime.unit
-
   end
 
 module Raz : RAZ = struct
