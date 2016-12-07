@@ -12,7 +12,33 @@ module F = Fingertree
 module Raz = Raz_simp
 module Raz2 = Raz_2.Raz
 
-(* inefficient but correct sequence implementation to use as baseline *)
+module Params = struct
+  let rnd_seed_ = ref 0         (* seed value for random number generation *)
+  let insert_ = ref 1000
+  let replace_ = ref 100
+  let observe_ = ref 100
+  let remove_ = ref 500
+
+  let args = [
+    ("--seed",    Arg.Set_int rnd_seed_,  " random seed");
+    ("--insert", Arg.Set_int insert_,   " number of insertions");
+    ("--replace", Arg.Set_int insert_,   " number of replacements (after a move)");
+    ("--observe", Arg.Set_int remove_,   " number of observations");
+    ("--remove", Arg.Set_int remove_,   " number of removals");
+  ]
+
+  let _ = Arg.parse args
+    (fun arg -> invalid_arg ("Unknown: "^arg))
+    "usage: eval [options]"
+
+  let rnd_seed = !rnd_seed_
+  let insert = !insert_
+  let replace = !replace_
+  let remove = !remove_
+  let observe = !observe_
+end
+
+(* inefficient but obviously correct sequence implementation to use as baseline *)
 module Seq = struct
   type seq = int list
   let singleton value = [value]
@@ -24,20 +50,6 @@ module Seq = struct
     without_index
   let to_list seq = seq
 
-end
-
-module Params = struct
-  let rnd_seed_ = ref 0         (* seed value for random number generation *)
-
-  let args = [
-    ("--seed",    Arg.Set_int rnd_seed_,  " random seed");
-  ]
-
-  let _ = Arg.parse args
-    (fun arg -> invalid_arg ("Unknown: "^arg))
-    "usage: eval [options]"
-
-  let rnd_seed = !rnd_seed_
 end
 
 type elm = int
@@ -127,7 +139,84 @@ let rec insert_r2 inserts r2 =
   let r2 = Raz2.insert Raz2.L v lev r2 in
   insert_r2 other_inserts r2
 
+(* TODO: create move-replace code *)
+let move_replace_seq replaces seq =
+  seq
+
+let move_replace_ft replaces ft =
+  ft
+
+let move_replace_r replaces r =
+  r
+
+let move_replace_r2 replaces r2 =
+  r2
+
+(* TODO: create observation code (returns list of observations) *)
+let observe_seq observes seq =
+  []
+
+let observe_ft observes ft =
+  []
+
+let observe_r observes r =
+  []
+
+let observe_r2 observes r2 =
+  []
+
+(* TODO: create removal code *)
+let remove_seq removals seq =
+  seq
+
+let remove_ft removals ft =
+  ft
+
+let remove_r removals r =
+  r
+
+let remove_r2 removals r2 =
+  r2
+
+
+(* the following generate lists of random commands, taking into account current sequence length *)
+
+(* makes a list of (position, value) pairs for inserting integers *)
+let gen_insertions initial_size total_insertions =
+  let rec gen current_size total l =
+    if total <= 0 then l else
+    let rand = (Random.int current_size,current_size) in
+    gen (current_size + 1) (total - 1) (rand::l)
+  in
+  List.rev (gen (initial_size + 1) total_insertions [])
+
+(* makes a list of (position, direction bool, moves, value) to move to and replace *)
+let gen_replaces initial_size total_replaces =
+  []
+
+(* makes a list of positions to look at *)
+let gen_observes initial_size total_observes =
+  []
+
+(* makes a list of positions for removing values *)
+let gen_removals initial_size total_removals =
+  let rec gen current_size total l =
+    if total <= 0 then l else
+    let rand = Random.int current_size in
+    gen (current_size - 1) (total - 1) (rand::l)
+  in
+  List.rev (gen initial_size total_removals [])
+
+let testfailure reason =
+  Printf.printf reason;
+  Printf.printf "\n";
+  Printf.printf "  params were: --seed %d --insert %d --replace %d --remove %d\n --observe %d\n"
+    Params.rnd_seed Params.insert Params.replace Params.remove Params.observe
+
 let test() =
+
+  (* TODO: change tests to folds over more common single operations *)
+
   (* init seqs *)
   let r = Raz.singleton 0 in
   let r2 = Raz2.empty (rnd_level())
@@ -136,55 +225,75 @@ let test() =
   let ft = F.singleton 0 in
   let seq = Seq.singleton 0 in
 
-  (* Printf.printf "after init\n"; *)
-
-  (* makes a list of (position, value) pairs for inserting integers *)
-  let gen_insertions initial_size total_insertions =
-    let rec gen current_size total l =
-      if total <= 0 then l else
-      let rand = (Random.int current_size,current_size) in
-      gen (current_size + 1) (total - 1) (rand::l)
-
-    in
-    List.rev (gen (initial_size + 1) total_insertions [])
-  in
-
-
   (* gen common test data *)
   Random.init Params.rnd_seed;
-  let inserts = gen_insertions 0 1000 in
+  let inserts = gen_insertions 0 Params.insert in
+  let move_replaces = gen_replaces Params.insert Params.replace in
+  let observes = gen_observes (Params.insert - Params.remove) Params.observe in
+  let removals = gen_removals Params.insert Params.remove in
 
-  (* run tests *)
+  (* run insertion tests *)
   let seq = insert_seq inserts seq in
   let ft = insert_ft inserts ft in
   let r = insert_r inserts r in
   let r2 = insert_r2 inserts r2 in
 
-  (* Print results *)
-  (* TODO: compare results *)
-  Printf.printf "Sequence(baseline): \n";
-  let seql = (to_list_seq seq) in
-  if false then List.iter (Printf.printf "%d; ") seql;
-  Printf.printf "\n";
+  (* convert to lists *)
+  let seql = to_list_seq seq in
+  let ftl = to_list_ft ft in
+  let rl = to_list_r r in
+  let r2l = to_list_r2 r2 in
 
-  Printf.printf "Fingertree: \n";
-  let ftl = (to_list_ft ft) in
-  if false then List.iter (Printf.printf "%d; ") ftl;
-  Printf.printf "\n";
+  (* check correctness *)
+  if seql <> ftl then testfailure "Fingertree failied the insertion step" else
+  if seql <> rl then testfailure "Raz_simp failed the insertion step" else
+  if seql <> r2l then testfailure "Raz2 failed the insertion step" else
+  
+  (* run move-replace tests *)
+  let seq = move_replace_seq move_replaces seq in
+  let ft = move_replace_ft move_replaces ft in
+  let r = move_replace_r move_replaces r in
+  let r2 = move_replace_r2 move_replaces r2 in
 
-  Printf.printf "Raz_simp: \n";
-  let rl = (to_list_r r) in
-  if false then List.iter (Printf.printf "%d; ") rl;
-  Printf.printf "\n";
+  (* convert to lists *)
+  let seql = to_list_seq seq in
+  let ftl = to_list_ft ft in
+  let rl = to_list_r r in
+  let r2l = to_list_r2 r2 in
 
-  Printf.printf "Raz2: \n";
-  let r2l = (to_list_r2 r2) in
-  if false then List.iter (Printf.printf "%d; ") r2l;
-  Printf.printf "\n" ;
-  assert (seql = ftl) ;
-  assert (seql = rl) ;
-  assert (seql = r2l) ;
-  Printf.printf "success!\n%!" ;
-  ()
+  (* check correctness *)
+  if seql <> ftl then testfailure "Fingertree failied the move-replace step" else
+  if seql <> rl then testfailure "Raz_simp failed the move-replace step" else
+  if seql <> r2l then testfailure "Raz2 failed the move-replace step" else
+
+  (* run observation tests *)
+  let seq_o = observe_seq observes seq in
+  let ft_o = observe_ft observes ft in
+  let r_o = observe_r observes r in
+  let r2_o = observe_r2 observes r2 in
+
+  (* check correctness *)
+  if seq_o <> ft_o then testfailure "Fingertree failied the observe step" else
+  if seq_o <> r_o then testfailure "Raz_simp failed the observe step" else
+  if seq_o <> r2_o then testfailure "Raz2 failed the observe step" else
+
+  (* run removal tests *)
+  let seq = remove_seq removals seq in
+  let ft = remove_ft removals ft in
+  let r = remove_r removals r in
+  let r2 = remove_r2 removals r2 in
+
+  (* convert to lists *)
+  let seql = to_list_seq seq in
+  let ftl = to_list_ft ft in
+  let rl = to_list_r r in
+  let r2l = to_list_r2 r2 in
+
+  (* check correctness *)
+  if seql <> ftl then testfailure "Fingertree failied the removal step" else
+  if seql <> rl then testfailure "Raz_simp failed the removal step" else
+  if seql <> r2l then testfailure "Raz2 failed the removal step" else
+
+  Printf.printf "Success\n"
   
 let _ = test()
