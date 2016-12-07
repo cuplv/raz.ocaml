@@ -12,6 +12,8 @@ module F = Fingertree
 module Raz = Raz_simp
 module Raz2 = Raz_2.Raz
 
+(* TODO: test both directions for all ops *)
+
 module Params = struct
   let rnd_seed_ = ref 0         (* seed value for random number generation *)
   let insert_ = ref 1000
