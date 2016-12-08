@@ -1,16 +1,12 @@
 (* 
 This file is mostly tests of correctness.
-
-RAZ code is all in  'raz_simp.ml', and 'raz_2.ml'
-
-Fingertree impl is in 'fingertree.ml'
-'bat*.ml' files support the fingertree code.
-Fingertree and supporting files are from 'https://github.com/ocaml-batteries-team/batteries-included'
 *)
 
-module F = Fingertree
-module Raz = Raz_simp
-module Raz2 = Raz_2.Raz
+open Zipper
+module SQ = Seq
+module FT = FingerTree
+module RS = RazSimple
+module RF = RazFormal
 
 (* TODO: test both directions for all ops *)
 
@@ -40,155 +36,17 @@ module Params = struct
   let observe = !observe_
 end
 
-(* inefficient but obviously correct sequence implementation to use as baseline *)
-module Seq = struct
-  type seq = int list
-  let singleton value = [value]
-  let insert value index seq =
-    let with_index = List.mapi (fun i a -> (i,a)) seq in
-    let (left,right) = List.partition (fun (i,_) -> i < index) with_index in
-    let with_val = left @ ((0,value)::right) in
-    let without_index = List.map (fun (_,a) -> a) with_val in
-    without_index
-  let to_list seq = seq
-
-end
-
-type elm = int
-[@@deriving show]
-
-let rnd_level = Raz.rnd_level
-
-let to_list_seq = Seq.to_list
-
-let to_list_ft ft =
-  let rec drain ft l =
-    match F.last ft with
-    | None -> l
-    | Some(e) ->
-    let l = e::l in
-    match F.init ft with
-    | None -> l
-    | Some(ft) ->
-    drain ft l
-  in
-  drain ft []
-
-let to_list_r r =
-  let t = Raz.unfocus r in
-  let size = Raz.item_count t in
-  let r = Raz.focus t size in
-  let rec drain r l size =
-    match size with
-    | 0 -> l
-    | _ ->
-    let l = (Raz.view Raz.L r)::l in
-    let r = Raz.remove Raz.L r in
-    drain r l (size - 1)
-  in
-  drain r [(Raz.view_c r)] (size - 1)
-
-
-let to_list_r2 r2 =
-  (* let _ = Format.printf "pre-unfocus: r2=%a\n%!" (Raz2.pp_zip pp_elm) r2 in *)
-  let t = Raz2.unfocus r2 in
-  (* let _ = Format.printf "pre-focus: t=%a\n%!" (Raz2.pp_tree pp_elm) t in *)
-  let size = Raz2.elm_cnt t in
-  let r2 = Raz2.focus t size in
-  let rec drain r2 l =
-    (* let _ = Format.printf "pre-peek: r2=%a\n%!" (Raz2.pp_zip pp_elm) r2 in *)
-    match Raz2.peek Raz2.L r2 with
-    | None -> l
-    | Some(e) ->
-    let l = e::l in
-    (* let _ = Format.printf "pre-remove: r2=%a\n%!" (Raz2.pp_zip pp_elm) r2 in *)
-    let r2 = Raz2.do_cmd (Raz2.Remove(Raz2.L)) r2 in
-    drain r2 l
-  in
-  drain r2 []
-
-let rec insert_seq inserts seq =
-  match inserts with
-  | [] -> seq
-  | (p,v)::other_inserts ->
-  let seq = Seq.insert v p seq in
-  insert_seq other_inserts seq
-
-let rec insert_ft inserts ft =
-  match inserts with
-  | [] -> ft
-  | (p,v)::other_inserts ->
-  let left, right = F.split_at ft p in
-  let ft = F.append (F.snoc left v) right in
-  insert_ft other_inserts ft
-
-let rec insert_r inserts r =
-  match inserts with
-  | [] -> r
-  | (p,v)::other_inserts ->
-  let t = Raz.unfocus r in
-  let r = Raz.focus t p in
-  let r = Raz.insert Raz.L v r in
-  insert_r other_inserts r
-
-let rec insert_r2 inserts r2 =
-  match inserts with
-  | [] -> r2
-  | (p,v)::other_inserts ->
-  let lev = rnd_level() in
-  let t  = Raz2.unfocus r2 in
-  let r2 = Raz2.focus t p in
-  let r2 = Raz2.insert Raz2.L v lev r2 in
-  insert_r2 other_inserts r2
-
-(* TODO: create move-replace code *)
-let move_replace_seq replaces seq =
-  seq
-
-let move_replace_ft replaces ft =
-  ft
-
-let move_replace_r replaces r =
-  r
-
-let move_replace_r2 replaces r2 =
-  r2
-
-(* TODO: create observation code (returns list of observations) *)
-let observe_seq observes seq =
-  []
-
-let observe_ft observes ft =
-  []
-
-let observe_r observes r =
-  []
-
-let observe_r2 observes r2 =
-  []
-
-(* TODO: create removal code *)
-let remove_seq removals seq =
-  seq
-
-let remove_ft removals ft =
-  ft
-
-let remove_r removals r =
-  r
-
-let remove_r2 removals r2 =
-  r2
-
-
 (* the following generate lists of random commands, taking into account current sequence length *)
 
 (* makes a list of (position, value) pairs for inserting integers *)
 let gen_insertions initial_size total_insertions =
   let rec gen current_size total l =
     if total <= 0 then l else
-    let rand = (Random.int current_size,current_size) in
-    gen (current_size + 1) (total - 1) (rand::l)
+    let rnd_dir = if Random.bool() then L else R in
+    let rnd_pos = Random.int current_size in
+    let rnd_val = current_size in (* this doesn't need to be random, so it's informative *)
+    let ins = (rnd_pos,rnd_dir,rnd_val) in
+    gen (current_size + 1) (total - 1) (ins::l)
   in
   List.rev (gen (initial_size + 1) total_insertions [])
 
@@ -217,15 +75,11 @@ let testfailure reason =
 
 let test() =
 
-  (* TODO: change tests to folds over more common single operations *)
-
   (* init seqs *)
-  let r = Raz.singleton 0 in
-  let r2 = Raz2.empty (rnd_level())
-    |> Raz2.do_cmd (Raz2.Insert(Raz2.L,0,rnd_level()))
-  in
-  let ft = F.singleton 0 in
-  let seq = Seq.singleton 0 in
+  let r = RS.singleton 0 in
+  let r2 = RF.singleton 0 in
+  let ft = FT.singleton 0 in
+  let seq = SQ.singleton 0 in
 
   (* gen common test data *)
   Random.init Params.rnd_seed;
@@ -235,66 +89,26 @@ let test() =
   let removals = gen_removals Params.insert Params.remove in
 
   (* run insertion tests *)
-  let seq = insert_seq inserts seq in
-  let ft = insert_ft inserts ft in
-  let r = insert_r inserts r in
-  let r2 = insert_r2 inserts r2 in
+  let seq = List.fold_left (fun s (p,d,v) -> SQ.unfocus s |> SQ.focus p |> SQ.insert d v) seq inserts in 
+  let ft = List.fold_left (fun s (p,d,v) -> FT.unfocus s |> FT.focus p |> FT.insert d v) ft inserts in
+  let r = List.fold_left (fun s (p,d,v) -> RS.unfocus s |> RS.focus p |> RS.insert d v) r inserts in
+  let r2 = List.fold_left (fun s (p,d,v) -> RF.unfocus s |> RF.focus p |> RF.insert d v) r2 inserts in
 
   (* convert to lists *)
-  let seql = to_list_seq seq in
-  let ftl = to_list_ft ft in
-  let rl = to_list_r r in
-  let r2l = to_list_r2 r2 in
+  let seql = SQ.list_of_zipper (SQ.unfocus seq) in
+  let ftl = FT.list_of_zipper (FT.unfocus ft) in
+  let rl = RS.list_of_zipper (RS.unfocus r) in
+  let r2l = RF.list_of_zipper (RF.unfocus r2) in
 
   (* check correctness *)
   if seql <> ftl then testfailure "Fingertree failied the insertion step" else
   if seql <> rl then testfailure "Raz_simp failed the insertion step" else
   if seql <> r2l then testfailure "Raz2 failed the insertion step" else
-  
-  (* run move-replace tests *)
-  let seq = move_replace_seq move_replaces seq in
-  let ft = move_replace_ft move_replaces ft in
-  let r = move_replace_r move_replaces r in
-  let r2 = move_replace_r2 move_replaces r2 in
 
-  (* convert to lists *)
-  let seql = to_list_seq seq in
-  let ftl = to_list_ft ft in
-  let rl = to_list_r r in
-  let r2l = to_list_r2 r2 in
-
-  (* check correctness *)
-  if seql <> ftl then testfailure "Fingertree failied the move-replace step" else
-  if seql <> rl then testfailure "Raz_simp failed the move-replace step" else
-  if seql <> r2l then testfailure "Raz2 failed the move-replace step" else
-
-  (* run observation tests *)
-  let seq_o = observe_seq observes seq in
-  let ft_o = observe_ft observes ft in
-  let r_o = observe_r observes r in
-  let r2_o = observe_r2 observes r2 in
-
-  (* check correctness *)
-  if seq_o <> ft_o then testfailure "Fingertree failied the observe step" else
-  if seq_o <> r_o then testfailure "Raz_simp failed the observe step" else
-  if seq_o <> r2_o then testfailure "Raz2 failed the observe step" else
-
-  (* run removal tests *)
-  let seq = remove_seq removals seq in
-  let ft = remove_ft removals ft in
-  let r = remove_r removals r in
-  let r2 = remove_r2 removals r2 in
-
-  (* convert to lists *)
-  let seql = to_list_seq seq in
-  let ftl = to_list_ft ft in
-  let rl = to_list_r r in
-  let r2l = to_list_r2 r2 in
-
-  (* check correctness *)
-  if seql <> ftl then testfailure "Fingertree failied the removal step" else
-  if seql <> rl then testfailure "Raz_simp failed the removal step" else
-  if seql <> r2l then testfailure "Raz2 failed the removal step" else
+(*
+  List.iter (Printf.printf "%d;") seql;
+  Printf.printf "\n";
+*)
 
   Printf.printf "Success\n"
   
